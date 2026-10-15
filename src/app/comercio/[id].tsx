@@ -1,5 +1,9 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useVideoPlayer, VideoView } from "expo-video";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -7,55 +11,45 @@ import {
   View,
 } from "react-native";
 
-const comerciosMockDetalle = [
-  {
-    id: "1",
-    nombre: "Ferretería El Tornillo",
-    rubro: "Ferretería",
-    direccion: "9 de Julio 855",
-    telefono: "3442-123456",
-    whatsapp: "3442-998877",
-    descripcion:
-      "Todo tipo de herramientas, herrajes y materiales para la construcción con la mejor atención de la ciudad.",
-    mediosDePago: ["Efectivo", "Tarjeta de débito", "Transferencia"],
-    puntaje: 4.6,
-    cantidadResenas: 38,
-    promoVigente: "15% en pinturas - hasta el 30/09",
-  },
-  {
-    id: "2",
-    nombre: "Moda Urbana",
-    rubro: "Indumentaria",
-    direccion: "Galarza 1200",
-    telefono: "3442-654321",
-    whatsapp: "3442-112233",
-    descripcion: "Ropa urbana, calzado y accesorios para toda la familia.",
-    mediosDePago: ["Efectivo", "Tarjeta de crédito"],
-    puntaje: 4.2,
-    cantidadResenas: 19,
-    promoVigente: "20% en camperas - hasta el 15/10",
-  },
-  {
-    id: "3",
-    nombre: "Tecno Centro",
-    rubro: "Tecnología",
-    direccion: "San Martín 750",
-    telefono: null,
-    whatsapp: "3442-554433",
-    descripcion:
-      "Celulares, insumos de computación y servicio técnico especializado.",
-    mediosDePago: ["Efectivo", "Mercado Pago"],
-    puntaje: 4.9,
-    cantidadResenas: 52,
-    promoVigente: null,
-  },
-];
+import { obtenerComercioPorId } from "../../servicios/comercios";
+import { Comercio } from "../../tipos/comercios";
 
 export default function DetalleComercioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const comercio = comerciosMockDetalle.find((c) => c.id === id);
+  const [comercio, setComercio] = useState<Comercio | null>(null);
+  const [cargando, setCargando] = useState<boolean>(true);
+
+  // Configuración del reproductor de video requerido por la cátedra
+  const videoSource = comercio?.videoPresentacion || "";
+  const player = useVideoPlayer(videoSource, (playerInstance) => {
+    playerInstance.loop = true;
+  });
+
+  useEffect(() => {
+    async function cargarDetalle() {
+      if (!id) return;
+      try {
+        const datos = await obtenerComercioPorId(id);
+        setComercio(datos);
+      } catch (error) {
+        console.error("Error al cargar el detalle del comercio:", error);
+      } finally {
+        setCargando(false);
+      }
+    }
+    cargarDetalle();
+  }, [id]);
+
+  if (cargando) {
+    return (
+      <View style={styles.centrado}>
+        <ActivityIndicator size="large" color="#0a7ea4" />
+        <Text style={{ marginTop: 8 }}>Cargando ficha del comercio...</Text>
+      </View>
+    );
+  }
 
   if (!comercio) {
     return (
@@ -84,39 +78,56 @@ export default function DetalleComercioScreen() {
       {/* Encabezado Ficha */}
       <Text style={styles.titulo}>{comercio.nombre}</Text>
       <Text style={styles.subTituloInfo}>
-        {comercio.rubro} • {comercio.direccion}
+        {comercio.rubro.toUpperCase()} • {comercio.direccion}
       </Text>
       <Text style={styles.estrellasDetalle}>
-        ⭐ {comercio.puntaje} ({comercio.cantidadResenas} reseñas)
+        ⭐ {comercio.promedioEstrellas} ({comercio.totalResenas} reseñas)
       </Text>
+
+      {/* Video de presentación (Expo Video - Requisito técnico) */}
+      {comercio.videoPresentacion ? (
+        <View style={styles.seccionVideo}>
+          <Text style={styles.tituloVideo}>🎥 Video de Presentación (30s)</Text>
+          <VideoView
+            player={player}
+            style={styles.video}
+            allowsFullscreen
+            allowsPictureInPicture
+          />
+        </View>
+      ) : null}
 
       {/* Botones de acción rápida: Llamar, WhatsApp, Ir (Mapa) */}
       <View style={styles.botonesContacto}>
         {comercio.telefono && (
-          <TouchableOpacity style={styles.botonAccion}>
+          <TouchableOpacity
+            style={styles.botonAccion}
+            onPress={() => Linking.openURL(`tel:${comercio.telefono}`)}
+          >
             <Text style={styles.textoBoton}>📞 Llamar</Text>
           </TouchableOpacity>
         )}
         {comercio.whatsapp && (
-          <TouchableOpacity style={[styles.botonAccion, styles.botonWhatsapp]}>
+          <TouchableOpacity
+            style={[styles.botonAccion, styles.botonWhatsapp]}
+            onPress={() =>
+              Linking.openURL(`https://wa.me/${comercio.whatsapp}`)
+            }
+          >
             <Text style={styles.textoBoton}>💬 WhatsApp</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.botonAccion, styles.botonIr]}>
+        <TouchableOpacity
+          style={[styles.botonAccion, styles.botonIr]}
+          onPress={() => {
+            // Ejemplo de enlace a mapas usando latitud y longitud
+            const url = `https://www.google.com/maps/search/?api=1&query=${comercio.latitud},${comercio.longitud}`;
+            Linking.openURL(url);
+          }}
+        >
           <Text style={styles.textoBoton}>📍 Ir</Text>
         </TouchableOpacity>
       </View>
-
-      {/* Sección de Promoción Vigente (exigida en el PRD) */}
-      {comercio.promoVigente && (
-        <View style={styles.seccionPromo}>
-          <Text style={styles.tituloPromo}>PROMOCIÓN VIGENTE</Text>
-          <Text style={styles.textoPromo}>{comercio.promoVigente}</Text>
-          <TouchableOpacity style={styles.botonPromoCodigo}>
-            <Text style={styles.textoBotonPromo}>Mostrar mi código</Text>
-          </TouchableOpacity>
-        </View>
-      )}
 
       {/* Información general */}
       <View style={styles.seccion}>
@@ -138,6 +149,12 @@ const styles = StyleSheet.create({
     padding: 20,
     backgroundColor: "#fff",
     paddingTop: 50,
+  },
+  centrado: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
   },
   botonVolver: {
     marginBottom: 12,
@@ -163,6 +180,21 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginBottom: 15,
   },
+  seccionVideo: {
+    marginBottom: 16,
+  },
+  tituloVideo: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 6,
+  },
+  video: {
+    width: "100%",
+    height: 200,
+    borderRadius: 8,
+    backgroundColor: "#000",
+  },
   botonesContacto: {
     flexDirection: "row",
     gap: 8,
@@ -182,37 +214,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#555",
   },
   textoBoton: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 14,
-  },
-  seccionPromo: {
-    backgroundColor: "#fff9c4",
-    padding: 14,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#fbc02d",
-    marginBottom: 16,
-  },
-  tituloPromo: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#f57f17",
-    marginBottom: 4,
-  },
-  textoPromo: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 10,
-  },
-  botonPromoCodigo: {
-    backgroundColor: "#f57f17",
-    padding: 10,
-    borderRadius: 6,
-    alignItems: "center",
-  },
-  textoBotonPromo: {
     color: "#fff",
     fontWeight: "bold",
     fontSize: 14,
