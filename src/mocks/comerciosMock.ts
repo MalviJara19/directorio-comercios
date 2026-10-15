@@ -1,35 +1,133 @@
-export interface Comercio {
-  id: string;
-  nombre: string;
-  rubro: string;
-  direccion: string;
-  promedioEstrellas: number;
-  totalResenas: number;
-}
 
-export const comerciosMock: Comercio[] = [
+import type {
+  Comercio,
+  Promocion,
+  Resena,
+  Rubro,
+} from '../tipos/comercios';
+
+export const RUBROS_MOCK: Rubro[] = [
   {
-    id: '1',
-    nombre: 'Almacén Don Jose',
-    rubro: 'almacen',
-    direccion: 'Belgrano 456',
-    promedioEstrellas: 4.8,
-    totalResenas: 24,
+    id: 'rubro-1',
+    nombre: 'Ferretería y construcción',
+    icono: 'hammer',
+    color: '#E67E22',
+    orden: 1,
   },
   {
-    id: '2',
-    nombre: 'Verdulería La Estación',
-    rubro: 'verdulerica',
-    direccion: 'Rivadavia 789',
-    promedioEstrellas: 4.5,
-    totalResenas: 15,
+    id: 'rubro-2',
+    nombre: 'Indumentaria',
+    icono: 'shirt',
+    color: '#8E44AD',
+    orden: 2,
   },
   {
-    id: '3',
-    nombre: 'Panadería El Sol',
-    rubro: 'panaderia',
-    direccion: 'San Martín 321',
-    promedioEstrellas: 4.9,
-    totalResenas: 40,
+    id: 'rubro-3',
+    nombre: 'Tecnología',
+    icono: 'laptop',
+    color: '#2980B9',
+    orden: 3,
+  },
+];
+
+export const COMERCIOS_MOCK: Comercio[] = [
+  {
+    id: 'comercio-1',
+    nombre: 'Ferretería El Tornillo',
+    rubroId: 'rubro-1',
+    descripcion: 'Herramientas, pinturas y artículos para el hogar.',
+    direccion: 'Belgrano 456, Concepción del Uruguay',
+    coordenadas: { latitud: -32.4827, longitud: -58.2372 },
+    telefono: null,
+    whatsapp: null,
+    instagram: null,
+    imagenes: [],
+    videoUrl: null,
+    horarios: [
+      { dia: 1, abre: '08:00', cierra: '12:00' },
+      { dia: 1, abre: '16:00', cierra: '20:00' },
+      { dia: 2, abre: '08:00', cierra: '12:00' },
+      { dia: 2, abre: '16:00', cierra: '20:00' },
+      { dia: 3, abre: '08:00', cierra: '12:00' },
+      { dia: 3, abre: '16:00', cierra: '20:00' },
+      { dia: 4, abre: '08:00', cierra: '12:00' },
+      { dia: 4, abre: '16:00', cierra: '20:00' },
+      { dia: 5, abre: '08:00', cierra: '12:00' },
+      { dia: 5, abre: '16:00', cierra: '20:00' },
+      { dia: 6, abre: '08:00', cierra: '12:30' },
+    ],
+    mediosDePago: ['Efectivo', 'Débito', 'Transferencia'],
+    puntaje: 4.8,
+    cantidadResenas: 24,
+    codigoQr: null,
+    activo: true,
+  },
+  {
+    id: 'comercio-2',
+    nombre: 'Moda Urbana',
+    rubroId: 'rubro-2',
+    descripcion: 'Indumentaria y accesorios.',
+    direccion: 'Rivadavia 789, Concepción del Uruguay',
+    coordenadas: { latitud: -32.484, longitud: -58.235 },
+    telefono: null,
+    whatsapp: null,
+    instagram: null,
+    imagenes: [],
+    videoUrl: null,
+    horarios: [],
+    mediosDePago: ['Efectivo', 'Débito', 'Crédito'],
+    puntaje: 4.5,
+    cantidadResenas: 15,
+    codigoQr: null,
+    activo: true,
+  },
+  {
+    id: 'comercio-3',
+    nombre: 'Tecno Centro',
+    rubroId: 'rubro-3',
+    descripcion: 'Accesorios y productos tecnológicos.',
+    direccion: 'San Martín 321, Concepción del Uruguay',
+    coordenadas: { latitud: -32.481, longitud: -58.236 },
+    telefono: null,
+    whatsapp: null,
+    instagram: null,
+    imagenes: [],
+    videoUrl: null,
+    horarios: [],
+    mediosDePago: ['Efectivo', 'Transferencia'],
+    puntaje: 4.9,
+    cantidadResenas: 40,
+    codigoQr: null,
+    activo: true,
+  },
+];
+
+export const PROMOCIONES_MOCK: Promocion[] = [
+  {
+    id: 'promo-1',
+    comercioId: 'comercio-1',
+    titulo: '15% en pinturas',
+    detalle: 'Descuento en productos seleccionados.',
+    descuento: 15,
+    desde: '2026-10-01T00:00:00-03:00',
+    hasta: '2026-12-31T23:59:59-03:00',
+    imagenUrl: null,
+    soloApp: false,
+    usos: 0,
+    activa: true,
+  },
+];
+
+export const RESENAS_MOCK: Resena[] = [
+  {
+    id: 'resena-1',
+    comercioId: 'comercio-1',
+    usuarioId: 'usuario-1',
+    estrellas: 5,
+    comentario: 'Muy buena atención y variedad de productos.',
+    respuesta: null,
+    reportada: false,
+    creadaEn: '2026-10-05T10:30:00-03:00',
+    sincronizada: true,
   },
 ];

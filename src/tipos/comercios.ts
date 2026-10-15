@@ -1,63 +1,86 @@
-// Rubros oficiales pedidos por el Centro Comercial
-export type RubroComercio =
-  | 'gastronomia'
-  | 'indumentaria'
-  | 'hogar'
-  | 'ferreteria y construccion'
-  | 'salud y farmacia'
-  | 'servicios'
-  | ' tecnologia'
-  | 'libreria'
-  | 'otros';
 
-export interface HorarioAtencion {
-  aperturaManana: string | null; // Formato "HH:MM"
-  cierreManana: string | null;
-  aperturaTarde: string | null;
-  cierreTarde: string | null;
-  atiendeSabados: boolean;
-  cierreSabado: string | null;
+export interface Coordenadas {
+  latitud: number;
+  longitud: number;
+}
+
+export interface Horario {
+  dia: 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  abre: string;
+  cierra: string;
 }
 
 export interface Comercio {
-  id: string; // Identificadores como cadenas de texto, nunca números
+  id: string;
   nombre: string;
-  rubro: RubroComercio;
+  rubroId: string;
+  descripcion: string;
   direccion: string;
-  latitud: number;
-  longitud: number;
+  coordenadas: Coordenadas;
   telefono: string | null;
   whatsapp: string | null;
-  redesSociales: string | null;
+  instagram: string | null;
+  imagenes: string[];
+  videoUrl: string | null;
+  horarios: Horario[];
   mediosDePago: string[];
-  fotos: string[];
-  videoPresentacion: string | null; // URL del video corto de 30s (null si no tiene)
-  horarios: HorarioAtencion;
-  estaAbiertoPorVacaciones: boolean;
-  promedioEstrellas: number;
-  totalResenas: number;
+  puntaje: number;
+  cantidadResenas: number;
+  codigoQr: string | null;
+  activo: boolean;
+}
+
+export interface Rubro {
+  id: string;
+  nombre: string;
+  icono: string;
+  color: string;
+  orden: number;
 }
 
 export interface Promocion {
   id: string;
   comercioId: string;
   titulo: string;
-  descripcion: string;
-  descuentoPorcentaje: number | null; // Descuento en porcentaje entero (ej: 15)
-  fechaInicio: string; // ISO 8601 con zona
-  fechaFin: string; // ISO 8601 con zona
-  condiciones: string | null;
-  esExclusivaApp: boolean;
-  codigoPromo: string | null; // Código para mostrar en pantalla / escanear QR
+  detalle: string;
+  descuento: number | null;
+  desde: string;
+  hasta: string;
+  imagenUrl: string | null;
+  soloApp: boolean;
+  usos: number;
+  activa: boolean;
 }
 
 export interface Resena {
   id: string;
   comercioId: string;
   usuarioId: string;
-  nombreUsuario: string;
-  estrellas: number; // 1 a 5
+  estrellas: 1 | 2 | 3 | 4 | 5;
   comentario: string;
-  fechaCreacion: string;
-  respuestaComercio: string | null; // El comercio puede responder una vez
+  respuesta: string | null;
+  reportada: boolean;
+  creadaEn: string;
+  sincronizada: boolean;
+}
+
+export interface UsoDePromocion {
+  id: string;
+  promocionId: string;
+  usuarioId: string;
+  codigo: string;
+  validadoEn: string | null;
+}
+
+export type Rol = 'vecino' | 'comercio';
+
+export interface Usuario {
+  id: string;
+  nombre: string;
+  email: string;
+  rol: Rol;
+  comercioId: string | null;
+  favoritos: string[];
+  rubrosDeInteres: string[];
+  avisosActivos: boolean;
 }
