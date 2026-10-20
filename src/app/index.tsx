@@ -1,44 +1,73 @@
-import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, View } from 'react-native';
+
+// Definimos la estructura del comercio
+interface Comercio {
+  id: string;
+  nombre: string;
+  rubro: string;
+  direccion: string;
+}
+
+// Datos simulados para el directorio
+const comerciosMock: Comercio[] = [
+  {
+    id: '1',
+    nombre: 'Ferretería El Tornillo',
+    rubro: 'Ferretería',
+    direccion: 'Concepción del Uruguay',
+  },
+  {
+    id: '2',
+    nombre: 'Moda Urbana',
+    rubro: 'Indumentaria',
+    direccion: 'Concepción del Uruguay',
+  },
+  {
+    id: '3',
+    nombre: 'Tecno Centro',
+    rubro: 'Tecnología',
+    direccion: 'Concepción del Uruguay',
+  },
+];
 
 export default function HomeScreen() {
+  const [busqueda, setBusqueda] = useState('');
+
+  // Filtramos los comercios según lo que escribas en el buscador (por nombre o rubro)
+  const comerciosFiltrados = comerciosMock.filter((comercio) =>
+    comercio.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
+    comercio.rubro.toLowerCase().includes(busqueda.toLowerCase())
+  );
+
   return (
     <View style={styles.container}>
-<Text style={styles.titulo}>
-  Directorio de Comercios
-</Text>
+      <Text style={styles.titulo}>Directorio de Comercios</Text>
 
-<Image
-  source={require('../../assets/images/comercios.jpg')}
-  style={styles.imagen}
-  resizeMode="contain"
-/>
-
-      <Text style={styles.eslogan}>
-        Todo lo que buscás, cerca tuyo.
+      <Text style={styles.subtitulo}>
+        Encontrá lo que necesitás cerca tuyo
       </Text>
 
-      <View style={styles.separador} />
+      <TextInput
+        style={styles.busqueda}
+        placeholder="🔎 Buscar un comercio..."
+        value={busqueda}
+        onChangeText={setBusqueda}
+      />
 
-      <Text style={styles.descripcion}>
-        Descubrí los comercios de nuestra ciudad en un solo lugar.
-        {"\n\n"}
-        Encontrá negocios, conocé qué ofrecen y descubrí promociones
-        para aprovechar.
-      </Text>
-
-      <Pressable
-        style={styles.boton}
-        onPress={() => router.push('/buscar')}
-      >
-        <Text style={styles.textoBoton}>
-          Explorar comercios  →
-        </Text>
-      </Pressable>
-
-      <Text style={styles.pie}>
-        Los comercios de nuestra ciudad, más cerca de vos.
-      </Text>
+      <FlatList
+        data={comerciosFiltrados}
+        keyExtractor={(item) => item.id}
+        style={{ width: '100%' }}
+        showsVerticalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.comercio}>🏪 {item.nombre}</Text>
+            <Text style={styles.rubroTexto}>{item.rubro}</Text>
+            <Text style={styles.bienvenida}>📍 {item.direccion}</Text>
+          </View>
+        )}
+      />
     </View>
   );
 }
@@ -46,74 +75,52 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F4F8F6',
     alignItems: 'center',
-    justifyContent: 'center',
-    padding: 28,
-  },
-  icono: {
-    fontSize: 58,
-    marginBottom: 14,
+    justifyContent: 'flex-start',
+    padding: 20,
+    backgroundColor: '#fff',
   },
   titulo: {
-    fontSize: 30,
+    fontSize: 28,
     fontWeight: 'bold',
-    color: '#245746',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 5,
   },
-  eslogan: {
-    fontSize: 18,
-    color: '#537568',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  separador: {
-    width: 65,
-    height: 4,
-    backgroundColor: '#77B69A',
-    borderRadius: 5,
-    marginBottom: 24,
-  },
-  descripcion: {
+  subtitulo: {
     fontSize: 16,
-    lineHeight: 25,
-    color: '#394B43',
+    color: '#666',
     textAlign: 'center',
-    marginBottom: 25,
+    marginBottom: 15,
   },
-  ilustracion: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 22,
-    marginBottom: 32,
-  },
-  emoji: {
-    fontSize: 42,
-  },
-  boton: {
-    backgroundColor: '#28664F',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 14,
+  busqueda: {
     width: '100%',
-    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 10,
+    backgroundColor: '#fff',
   },
-  textoBoton: {
-    color: '#FFFFFF',
-    fontSize: 17,
+  card: {
+    width: '100%',
+    padding: 15,
+    borderRadius: 12,
+    backgroundColor: '#f2f2f2',
+    marginTop: 12,
+  },
+  comercio: {
+    fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 4,
   },
-  pie: {
-    fontSize: 12,
-    color: '#708078',
-    textAlign: 'center',
-    marginTop: 25,
+  rubroTexto: {
+    fontSize: 14,
+    color: '#444',
+    marginBottom: 4,
   },
-  imagen: {
-  width: '100%',
-  height: 200,
-  marginBottom: 20,
-},
+  bienvenida: {
+    fontSize: 14,
+    color: '#666',
+  },
 });
