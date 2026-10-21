@@ -1,5 +1,9 @@
-import { Comercio, Promocion, Resena } from '../tipos/comercios'; // Ajustá si tu archivo en tipos se llama diferente (ej: comercios.ts)
-import { COMERCIOS_MOCK, PROMOCIONES_MOCK, RESENAS_MOCK } from '../mocks/comerciosMock.ts';
+import {
+  COMERCIOS_MOCK,
+  PROMOCIONES_MOCK,
+  RESENAS_MOCK,
+} from "../mocks/comerciosMock";
+import { Comercio, Promocion, Resena } from "../tipos/comercios";
 
 // Función auxiliar para simular un retraso de red (latencia)
 const simularRed = (ms: number = 500): Promise<void> => {
@@ -13,7 +17,9 @@ export async function obtenerComercios(): Promise<Comercio[]> {
 }
 
 // Obtener un comercio por su ID (para la ficha de detalle)
-export async function obtenerComercioPorId(id: string): Promise<Comercio | null> {
+export async function obtenerComercioPorId(
+  id: string,
+): Promise<Comercio | null> {
   await simularRed();
   const comercio = COMERCIOS_MOCK.find((c) => c.id === id);
   return comercio || null;
@@ -26,7 +32,9 @@ export async function obtenerPromociones(): Promise<Promocion[]> {
 }
 
 // Obtener las reseñas de un comercio específico
-export async function obtenerResenasPorComercio(comercioId: string): Promise<Resena[]> {
+export async function obtenerResenasPorComercio(
+  comercioId: string,
+): Promise<Resena[]> {
   await simularRed();
   return RESENAS_MOCK.filter((r) => r.comercioId === comercioId);
 }

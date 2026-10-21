@@ -11,9 +11,9 @@ import {
   View,
 } from "react-native";
 
-import { obtenerComercios } from "../servicios/comercios";
-import { Comercio, RubroComercio } from "../tipos/comercios";
-import { estaAbiertoAhora } from "../utilidades/horarios";
+import { obtenerComercios } from "@/servicios/serviciosComercios";
+import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { estaAbiertoAhora } from "@/utilidades/horarios";
 
 // Lista de rubros oficiales según las especificaciones
 const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
@@ -57,22 +57,39 @@ export default function HomeScreen() {
     cargar();
   }, []);
 
-  // Filtrado combinado: Texto + Rubro + Abierto Ahora
+  // Función para ignorar tildes/acentos en las búsquedas
+  const quitarAcentos = (texto: string) =>
+    texto
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase();
+
   const comerciosFiltrados = comercios.filter((comercio) => {
-    // 1. Filtro por texto
+    const busquedaLimpia = quitarAcentos(busqueda);
+
+    const coincideNombre = quitarAcentos(comercio.nombre).includes(
+      busquedaLimpia,
+    );
+    const coincideRubro = quitarAcentos(comercio.rubro).includes(
+      busquedaLimpia,
+    );
+    const coincideDireccion = quitarAcentos(comercio.direccion).includes(
+      busquedaLimpia,
+    );
+    const coincideDescripcion = comercio.descripcion
+      ? quitarAcentos(comercio.descripcion).includes(busquedaLimpia)
+      : false;
+
     const coincideTexto =
-      comercio.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      comercio.rubro.toLowerCase().includes(busqueda.toLowerCase()) ||
-      comercio.direccion.toLowerCase().includes(busqueda.toLowerCase());
+      coincideNombre ||
+      coincideRubro ||
+      coincideDireccion ||
+      coincideDescripcion;
 
     if (!coincideTexto) return false;
-
-    // 2. Filtro por rubro
     if (rubroSeleccionado !== "todos" && comercio.rubro !== rubroSeleccionado) {
       return false;
     }
-
-    // 3. Filtro Abierto Ahora
     if (soloAbiertos && !estaAbiertoAhora(comercio.horarios)) {
       return false;
     }
@@ -149,16 +166,18 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={styles.vacio}>
-              No se encontraron comercios que coincidan con la búsqueda.
+              {soloAbiertos && !busqueda && rubroSeleccionado === "todos"
+                ? "En este momento todos los comercios están cerrados."
+                : "No se encontraron comercios que coincidan con la búsqueda."}
             </Text>
           }
           renderItem={({ item }) => {
             const abierto = estaAbiertoAhora(item.horarios);
-
             return (
               <TouchableOpacity
                 style={styles.card}
-                onPress={() => router.push(`/comercio/${item.id}`)}
+                activeOpacity={0.7}
+                onPress={() => router.push(`/comercio/${item.id}` as any)}
               >
                 <Text style={styles.comercio}>{item.nombre}</Text>
                 <Text style={styles.rubroTexto}>
@@ -170,7 +189,7 @@ export default function HomeScreen() {
                   ⭐ {item.promedioEstrellas} estrellas ({item.totalResenas})
                 </Text>
 
-                {/* Si tiene promo, la mostramos */}
+                {/* Si esta cerrado por vacaciones, lo mostramos */}
                 {item.estaAbiertoPorVacaciones && (
                   <View style={styles.vacacionesBadge}>
                     <Text style={styles.vacacionesText}>

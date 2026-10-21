@@ -1,17 +1,17 @@
 // Rubros oficiales pedidos por el Centro Comercial
 export type RubroComercio =
-  | 'gastronomia'
-  | 'indumentaria'
-  | 'hogar'
-  | 'ferreteria y construccion'
-  | 'salud y farmacia'
-  | 'servicios'
-  | ' tecnologia'
-  | 'libreria'
-  | 'otros';
+  | "gastronomia"
+  | "indumentaria"
+  | "hogar"
+  | "ferreteria y construccion"
+  | "salud y farmacia"
+  | "servicios"
+  | "tecnologia"
+  | "libreria"
+  | "otros";
 
 export interface HorarioAtencion {
-  aperturaManana: string | null; // Formato "HH:MM"
+  aperturaManana: string | null;
   cierreManana: string | null;
   aperturaTarde: string | null;
   cierreTarde: string | null;
@@ -20,9 +20,10 @@ export interface HorarioAtencion {
 }
 
 export interface Comercio {
-  id: string; // Identificadores como cadenas de texto, nunca números
+  id: string;
   nombre: string;
   rubro: RubroComercio;
+  descripcion: string;
   direccion: string;
   latitud: number;
   longitud: number;
@@ -31,7 +32,7 @@ export interface Comercio {
   redesSociales: string | null;
   mediosDePago: string[];
   fotos: string[];
-  videoPresentacion: string | null; // URL del video corto de 30s (null si no tiene)
+  videoPresentacion: string | null;
   horarios: HorarioAtencion;
   estaAbiertoPorVacaciones: boolean;
   promedioEstrellas: number;
@@ -43,12 +44,12 @@ export interface Promocion {
   comercioId: string;
   titulo: string;
   descripcion: string;
-  descuentoPorcentaje: number | null; // Descuento en porcentaje entero (ej: 15)
-  fechaInicio: string; // ISO 8601 con zona
-  fechaFin: string; // ISO 8601 con zona
+  descuentoPorcentaje: number | null;
+  fechaInicio: string;
+  fechaFin: string;
   condiciones: string | null;
   esExclusivaApp: boolean;
-  codigoPromo: string | null; // Código para mostrar en pantalla / escanear QR
+  codigoPromo: string | null;
 }
 
 export interface Resena {
@@ -56,8 +57,8 @@ export interface Resena {
   comercioId: string;
   usuarioId: string;
   nombreUsuario: string;
-  estrellas: number; // 1 a 5
+  estrellas: number;
   comentario: string;
   fechaCreacion: string;
-  respuestaComercio: string | null; // El comercio puede responder una vez
+  respuestaComercio: string | null;
 }

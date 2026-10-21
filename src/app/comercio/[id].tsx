@@ -11,8 +11,8 @@ import {
   View,
 } from "react-native";
 
-import { obtenerComercioPorId } from "../../servicios/comercios";
-import { Comercio } from "../../tipos/comercios";
+import { obtenerComercioPorId } from "@/servicios/serviciosComercios";
+import { Comercio } from "@/tipos/comercios";
 
 export default function DetalleComercioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -91,8 +91,7 @@ export default function DetalleComercioScreen() {
           <VideoView
             player={player}
             style={styles.video}
-            allowsFullscreen
-            allowsPictureInPicture
+            nativeControls={true}
           />
         </View>
       ) : null}
