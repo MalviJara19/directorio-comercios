@@ -21,7 +21,7 @@ export default function DetalleComercioScreen() {
   const [comercio, setComercio] = useState<Comercio | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
 
-  // Configuración del reproductor de video requerido por la cátedra
+  // Configuración del reproductor de video (Expo Video)
   const videoSource = comercio?.videoPresentacion || "";
   const player = useVideoPlayer(videoSource, (playerInstance) => {
     playerInstance.loop = true;
@@ -106,20 +106,26 @@ export default function DetalleComercioScreen() {
             <Text style={styles.textoBoton}>📞 Llamar</Text>
           </TouchableOpacity>
         )}
+
         {comercio.whatsapp && (
           <TouchableOpacity
             style={[styles.botonAccion, styles.botonWhatsapp]}
-            onPress={() =>
-              Linking.openURL(`https://wa.me/${comercio.whatsapp}`)
-            }
+            onPress={() => {
+              const numeroLimpio = comercio.whatsapp?.replace(/\D/g, "") || "";
+              const urlWhatsapp = `https://api.whatsapp.com/send?phone=${numeroLimpio}`;
+
+              Linking.openURL(urlWhatsapp).catch((err) =>
+                console.error("Error al abrir WhatsApp:", err)
+              );
+            }}
           >
             <Text style={styles.textoBoton}>💬 WhatsApp</Text>
           </TouchableOpacity>
         )}
+
         <TouchableOpacity
           style={[styles.botonAccion, styles.botonIr]}
           onPress={() => {
-            // Ejemplo de enlace a mapas usando latitud y longitud
             const url = `https://www.google.com/maps/search/?api=1&query=${comercio.latitud},${comercio.longitud}`;
             Linking.openURL(url);
           }}
@@ -130,12 +136,12 @@ export default function DetalleComercioScreen() {
 
       {/* Información general */}
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>Descripción</Text>
+        <Text style={styles.subtituloSeccion}>📄 Descripción</Text>
         <Text style={styles.texto}>{comercio.descripcion}</Text>
       </View>
 
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>Medios de pago</Text>
+        <Text style={styles.subtituloSeccion}>💳 Medios de pago aceptados</Text>
         <Text style={styles.texto}>{comercio.mediosDePago.join(", ")}</Text>
       </View>
     </ScrollView>

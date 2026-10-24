@@ -15,7 +15,6 @@ import { obtenerComercios } from "@/servicios/serviciosComercios";
 import { Comercio, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 
-// Lista de rubros oficiales según las especificaciones
 const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
   { label: "Todos", value: "todos" },
   { label: "Gastronomía", value: "gastronomia" },
@@ -35,14 +34,12 @@ export default function HomeScreen() {
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
-  // Filtros
   const [busqueda, setBusqueda] = useState<string>("");
   const [rubroSeleccionado, setRubroSeleccionado] = useState<
     RubroComercio | "todos"
   >("todos");
   const [soloAbiertos, setSoloAbiertos] = useState<boolean>(false);
 
-  // Carga asíncrona desde la capa de servicios
   useEffect(() => {
     async function cargar() {
       try {
@@ -57,7 +54,6 @@ export default function HomeScreen() {
     cargar();
   }, []);
 
-  // Función para ignorar tildes/acentos en las búsquedas
   const quitarAcentos = (texto: string) =>
     texto
       .normalize("NFD")
@@ -177,7 +173,12 @@ export default function HomeScreen() {
               <TouchableOpacity
                 style={styles.card}
                 activeOpacity={0.7}
-                onPress={() => router.push(`/comercio/${item.id}` as any)}
+                onPress={() =>
+                  router.push({
+                    pathname: "/comercio/[id]",
+                    params: { id: item.id },
+                  })
+                }
               >
                 <Text style={styles.comercio}>{item.nombre}</Text>
                 <Text style={styles.rubroTexto}>
@@ -189,7 +190,6 @@ export default function HomeScreen() {
                   ⭐ {item.promedioEstrellas} estrellas ({item.totalResenas})
                 </Text>
 
-                {/* Si esta cerrado por vacaciones, lo mostramos */}
                 {item.estaAbiertoPorVacaciones && (
                   <View style={styles.vacacionesBadge}>
                     <Text style={styles.vacacionesText}>

@@ -11,7 +11,7 @@ export const COMERCIOS_MOCK: Comercio[] = [
     latitud: -32.48,
     longitud: -58.23,
     telefono: "3442123456",
-    whatsapp: "3442123456",
+    whatsapp: "5493442123456", // <-- Agregamos el 549 adelante
     redesSociales: "@donjose",
     mediosDePago: ["Efectivo", "Transferencia"],
     fotos: [],
@@ -65,7 +65,7 @@ export const COMERCIOS_MOCK: Comercio[] = [
     latitud: -32.47,
     longitud: -58.22,
     telefono: "3442654321",
-    whatsapp: "3442654321",
+    whatsapp: "5493442654321", // <-- Agregamos el 549 adelante
     redesSociales: null,
     mediosDePago: ["Efectivo", "Débito"],
     fotos: [],
