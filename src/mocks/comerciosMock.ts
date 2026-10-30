@@ -1,4 +1,4 @@
-import { Comercio, Promocion, Resena } from "../tipos/comercios";
+import { Comercio } from "../tipos/comercios";
 
 export const COMERCIOS_MOCK: Comercio[] = [
   {
@@ -11,11 +11,16 @@ export const COMERCIOS_MOCK: Comercio[] = [
     latitud: -32.48,
     longitud: -58.23,
     telefono: "3442123456",
-    whatsapp: "5493442123456", // <-- Agregamos el 549 adelante
+    whatsapp: "5493442123456",
     redesSociales: "@donjose",
     mediosDePago: ["Efectivo", "Transferencia"],
-    fotos: [],
-    videoPresentacion: null,
+    fotos: [
+      "https://picsum.photos/id/1060/800/600",
+      "https://picsum.photos/id/225/800/600",
+      "https://picsum.photos/id/312/800/600",
+    ],
+    videoPresentacion:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
     horarios: {
       aperturaManana: "08:00",
       cierreManana: "12:30",
@@ -65,7 +70,7 @@ export const COMERCIOS_MOCK: Comercio[] = [
     latitud: -32.47,
     longitud: -58.22,
     telefono: "3442654321",
-    whatsapp: "5493442654321", // <-- Agregamos el 549 adelante
+    whatsapp: "5493442654321",
     redesSociales: null,
     mediosDePago: ["Efectivo", "Débito"],
     fotos: [],
@@ -81,33 +86,5 @@ export const COMERCIOS_MOCK: Comercio[] = [
     estaAbiertoPorVacaciones: false,
     promedioEstrellas: 4.9,
     totalResenas: 40,
-  },
-];
-
-export const PROMOCIONES_MOCK: Promocion[] = [
-  {
-    id: "p1",
-    comercioId: "1",
-    titulo: "20% de descuento en fideos",
-    descripcion: "Presentando este cupón los días martes.",
-    descuentoPorcentaje: 20,
-    fechaInicio: "2026-01-01T00:00:00Z",
-    fechaFin: "2026-12-31T23:59:59Z",
-    condiciones: "Válido solo en efectivo.",
-    esExclusivaApp: true,
-    codigoPromo: "DONJOSE20",
-  },
-];
-
-export const RESENAS_MOCK: Resena[] = [
-  {
-    id: "r1",
-    comercioId: "1",
-    usuarioId: "u1",
-    nombreUsuario: "Juan Pérez",
-    estrellas: 5,
-    comentario: "Excelente atención y precios.",
-    fechaCreacion: "2026-03-01T10:00:00Z",
-    respuestaComercio: "¡Muchas gracias Juan!",
   },
 ];

@@ -3,6 +3,7 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Linking,
   ScrollView,
   StyleSheet,
@@ -96,7 +97,7 @@ export default function DetalleComercioScreen() {
         </View>
       ) : null}
 
-      {/* Botones de acción rápida: Llamar, WhatsApp, Ir (Mapa) */}
+      {/* Botones de acción rápida: Llamar, WhatsApp, Redes, Ir (Mapa) */}
       <View style={styles.botonesContacto}>
         {comercio.telefono && (
           <TouchableOpacity
@@ -115,11 +116,26 @@ export default function DetalleComercioScreen() {
               const urlWhatsapp = `https://api.whatsapp.com/send?phone=${numeroLimpio}`;
 
               Linking.openURL(urlWhatsapp).catch((err) =>
-                console.error("Error al abrir WhatsApp:", err)
+                console.error("Error al abrir WhatsApp:", err),
               );
             }}
           >
             <Text style={styles.textoBoton}>💬 WhatsApp</Text>
+          </TouchableOpacity>
+        )}
+
+        {comercio.redesSociales && (
+          <TouchableOpacity
+            style={[styles.botonAccion, styles.botonRedes]}
+            onPress={() => {
+              const usuario = comercio.redesSociales?.replace("@", "") || "";
+              const urlRed = `https://instagram.com/${usuario}`;
+              Linking.openURL(urlRed).catch((err) =>
+                console.error("Error al abrir redes sociales:", err),
+              );
+            }}
+          >
+            <Text style={styles.textoBoton}>🌐 Redes</Text>
           </TouchableOpacity>
         )}
 
@@ -133,6 +149,26 @@ export default function DetalleComercioScreen() {
           <Text style={styles.textoBoton}>📍 Ir</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Galería de Fotos del local */}
+      {comercio.fotos && comercio.fotos.length > 0 ? (
+        <View style={styles.seccion}>
+          <Text style={styles.subtituloSeccion}>🖼️ Fotos del local</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.contenedorFotos}
+          >
+            {comercio.fotos.map((fotoUrl, index) => (
+              <Image
+                key={index}
+                source={{ uri: fotoUrl }}
+                style={styles.miniaturaFoto}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* Información general */}
       <View style={styles.seccion}>
@@ -202,11 +238,13 @@ const styles = StyleSheet.create({
   },
   botonesContacto: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 8,
     marginBottom: 20,
   },
   botonAccion: {
-    flex: 1,
+    flexBasis: "48%",
+    flexGrow: 1,
     backgroundColor: "#0a7ea4",
     padding: 12,
     borderRadius: 8,
@@ -215,6 +253,9 @@ const styles = StyleSheet.create({
   botonWhatsapp: {
     backgroundColor: "#25D366",
   },
+  botonRedes: {
+    backgroundColor: "#E1306C",
+  },
   botonIr: {
     backgroundColor: "#555",
   },
@@ -222,6 +263,17 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     fontSize: 14,
+  },
+  contenedorFotos: {
+    flexDirection: "row",
+    marginTop: 8,
+  },
+  miniaturaFoto: {
+    width: 120,
+    height: 90,
+    borderRadius: 6,
+    marginRight: 8,
+    backgroundColor: "#eee",
   },
   seccion: {
     marginBottom: 14,
