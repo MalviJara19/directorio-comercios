@@ -19,6 +19,7 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
+    console.log("Se presionó el botón de iniciar sesión");
     if (!email.trim() || !contraseña) {
       Alert.alert("error", "Por favor, complete todos los campos requeridos");
       return;
@@ -58,7 +59,7 @@ Alert.alert(
   `Hola ${respuesta.datos.usuario.nombre}`,
 );
 
-router.replace("/(tabs)");
+router.replace("/");
     } catch (error: any) {
       console.log(
         "Error al iniciar sesión:",
