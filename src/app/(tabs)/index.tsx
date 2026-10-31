@@ -14,6 +14,7 @@ import {
 import { obtenerComercios } from "@/servicios/serviciosComercios";
 import { Comercio, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
+import { Button } from "react-native";
 
 const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
   { label: "Todos", value: "todos" },
@@ -95,6 +96,10 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.container}>
+      <Button
+        title="Cerrar sesión"
+        onPress={() => router.replace("/auth/login")}
+      />
       <Text style={styles.titulo}>Directorio de Comercios</Text>
       <Text style={styles.subtitulo}>
         Centro Comercial de Concepción del Uruguay

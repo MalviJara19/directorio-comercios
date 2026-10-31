@@ -9,19 +9,21 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-  
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      
-      {/* El Stack permite navegar desde la lista principal hacia la ficha del comercio */}
-      <Stack>
-        <Stack.Screen name="index" options={{ headerShown: false }} />
-        <Stack.Screen 
-          name="comercio/[id]" 
-          options={{ title: "Ficha del Comercio", headerBackTitle: "Volver" }} 
-        />
-      </Stack>
+    <AnimatedSplashOverlay />
+    <Stack initialRouteName="auth/login">
+      <Stack.Screen name="auth/login" options={{ headerShown: false }} />
+
+      <Stack.Screen name="auth/registro" options={{ title: "Crear cuenta" }} />
+
+      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+
+      <Stack.Screen
+        name="comercio/[id]"
+        options={{ title: "Detalle del comercio" }}
+      />
+    </Stack>
     </ThemeProvider>
   );
 }
