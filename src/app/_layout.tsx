@@ -9,6 +9,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useColorScheme } from 'react-native';
 
 import { AnimatedSplashOverlay } from '@/components/animated-icon';
+import { StatusBar } from "react-native";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -17,11 +18,38 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+      <StatusBar
+        backgroundColor="#FFFFFF"
+        barStyle="dark-content"
+      />
       <AnimatedSplashOverlay />
 
-      <Stack initialRouteName="auth/login">
+      <Stack initialRouteName="bienvenida" screenOptions={{ headerShown: false }}>
+        
+        <Stack.Screen
+          name="bienvenida"
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="auth/login"
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="cuenta/visitante"
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="perfiles/vecino"
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
+          name="perfiles/comercio"
+          options={{ title: 'Mi comercio' }}
+        />
+        <Stack.Screen
+          name="perfiles/datos-comercio"
           options={{ headerShown: false }}
         />
 

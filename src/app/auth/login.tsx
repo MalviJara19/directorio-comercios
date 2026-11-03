@@ -12,6 +12,7 @@ import {
 import { iniciarSesion } from "../../servicios/api";
 import { guardarToken, guardarUsuario } from "../../servicios/sesion";
 
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState<string>("");
@@ -59,20 +60,26 @@ Alert.alert(
   `Hola ${respuesta.datos.usuario.nombre}`,
 );
 
-router.replace("/");
-    } catch (error: any) {
-      console.log(
-        "Error al iniciar sesión:",
-        error.response?.data || error.message,
-      );
+const rol = respuesta.datos.usuario.rol;
 
-      const mensaje =
-        error.response?.data?.mensaje ||
-        error.response?.data?.message ||
-        "No se pudo conectar con el servidor. Intentá nuevamente.";
+if (rol === "vecino") {
+  router.replace("/");
+} else if (rol === "comercio") {
+  router.replace("/perfiles/comercio");
+} else {
+  Alert.alert("Error", "No se pudo identificar el tipo de usuario.");
+}
 
-      Alert.alert("Error al iniciar sesión", mensaje);
-    }
+} catch (error: any) {
+  console.log("Error al iniciar sesión:", error.response?.data || error.message);
+
+  const mensaje =
+    error.response?.data?.mensaje ||
+    error.response?.data?.message ||
+    "No se pudo conectar con el servidor. Intentá nuevamente.";
+
+  Alert.alert("Error al iniciar sesión", mensaje);
+}
   };
 
   // pantalla de inicio de sesion
