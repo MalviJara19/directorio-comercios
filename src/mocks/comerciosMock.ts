@@ -15,9 +15,9 @@ export const COMERCIOS_MOCK: Comercio[] = [
     redesSociales: "@donjose",
     mediosDePago: ["Efectivo", "Transferencia"],
     fotos: [
-      "https://picsum.photos/id/1060/800/600",
-      "https://picsum.photos/id/225/800/600",
-      "https://picsum.photos/id/312/800/600",
+      "https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1583258292688-d0213dc5a3a8?auto=format&fit=crop&w=800&q=80",
+      "https://images.unsplash.com/photo-1604719312566-8912e9227c6a?auto=format&fit=crop&w=800&q=80",
     ],
     videoPresentacion:
       "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",

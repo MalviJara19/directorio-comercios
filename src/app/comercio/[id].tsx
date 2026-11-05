@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -22,12 +23,6 @@ export default function DetalleComercioScreen() {
   const [comercio, setComercio] = useState<Comercio | null>(null);
   const [cargando, setCargando] = useState<boolean>(true);
 
-  // Configuración del reproductor de video (Expo Video)
-  const videoSource = comercio?.videoPresentacion || "";
-  const player = useVideoPlayer(videoSource, (playerInstance) => {
-    playerInstance.loop = true;
-  });
-
   useEffect(() => {
     async function cargarDetalle() {
       if (!id) return;
@@ -42,6 +37,14 @@ export default function DetalleComercioScreen() {
     }
     cargarDetalle();
   }, [id]);
+
+  // Instanciamos el reproductor directamente con la URL (o vacío en web)
+  const player = useVideoPlayer(
+    Platform.OS === "web" ? "" : (comercio?.videoPresentacion ?? ""),
+    (p) => {
+      p.loop = true;
+    },
+  );
 
   if (cargando) {
     return (
@@ -85,15 +88,25 @@ export default function DetalleComercioScreen() {
         ⭐ {comercio.promedioEstrellas} ({comercio.totalResenas} reseñas)
       </Text>
 
-      {/* Video de presentación (Expo Video - Requisito técnico) */}
-      {comercio.videoPresentacion ? (
+      {/* Video de presentación */}
+      {comercio.videoPresentacion && Platform.OS !== "web" ? (
         <View style={styles.seccionVideo}>
           <Text style={styles.tituloVideo}>🎥 Video de Presentación (30s)</Text>
           <VideoView
             player={player}
             style={styles.video}
             nativeControls={true}
+            allowsFullscreen
+            allowsPictureInPicture
           />
+        </View>
+      ) : comercio.videoPresentacion && Platform.OS === "web" ? (
+        <View style={styles.seccionVideo}>
+          <Text style={styles.tituloVideo}>🎥 Video de Presentación (30s)</Text>
+          <Text style={styles.avisoWeb}>
+            (El reproductor de video nativo se ejecuta en dispositivos móviles /
+            Expo Go).
+          </Text>
         </View>
       ) : null}
 
@@ -229,6 +242,14 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
     marginBottom: 6,
+  },
+  avisoWeb: {
+    fontSize: 13,
+    color: "#666",
+    fontStyle: "italic",
+    backgroundColor: "#f4f4f4",
+    padding: 10,
+    borderRadius: 6,
   },
   video: {
     width: "100%",

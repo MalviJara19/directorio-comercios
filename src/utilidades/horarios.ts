@@ -1,44 +1,49 @@
 import { HorarioAtencion } from "../../directorio-comercios/src/tipos/comercios";
 
 export const estaAbiertoAhora = (
-  horarios: HorarioAtencion,
+  horarios: HorarioAtencion & { enVacaciones?: boolean },
   fechaActual: Date = new Date(),
 ): boolean => {
   if (!horarios) return false;
 
-  const diaSemana = fechaActual.getDay(); // 0 = Domingo, 6 = Sábado
+  // 1. REGLA DE VACACIONES: Si está de vacaciones, siempre está cerrado
+  if (horarios.enVacaciones) {
+    return false;
+  }
+
+  const diaSemana = fechaActual.getDay();
   const horaActual = fechaActual.getHours();
   const minutosActuales = fechaActual.getMinutes();
   const minutosTotalesActuales = horaActual * 60 + minutosActuales;
 
-  // Si es domingo, por defecto cerrado (o podés ajustar según lógica)
-  if (diaSemana === 0) return false;
-
-  // Validación para Sábados
-  if (diaSemana === 6) {
-    if (!horarios.atiendeSabados || !horarios.cierreSabado) return false;
-
-    const aperturaM = horarios.aperturaManana
-      ? convertirAMinutos(horarios.aperturaManana)
-      : null;
-    const cierreS = convertirAMinutos(horarios.cierreSabado);
-
-    if (
-      aperturaM !== null &&
-      minutosTotalesActuales >= aperturaM &&
-      minutosTotalesActuales <= cierreS
-    ) {
-      return true;
-    }
+  // 2. Validación para Domingos (0)
+  if (diaSemana === 0) {
     return false;
   }
 
-  // Días de semana (Lunes a Viernes)
+  // 3. Validación para Sábados (6)
+  if (diaSemana === 6) {
+    if (
+      !horarios.atiendeSabados ||
+      !horarios.cierreSabado ||
+      !horarios.aperturaManana
+    ) {
+      return false;
+    }
+
+    const aperturaM = convertirAMinutos(horarios.aperturaManana);
+    const cierreS = convertirAMinutos(horarios.cierreSabado);
+    return (
+      minutosTotalesActuales >= aperturaM && minutosTotalesActuales < cierreS
+    );
+  }
+
+  // 4. Días de semana (Lunes a Viernes: 1 al 5)
   // Turno Mañana
   if (horarios.aperturaManana && horarios.cierreManana) {
     const abreM = convertirAMinutos(horarios.aperturaManana);
-    const cierraM = convertirAMinutos(horarios.cierreManana);
-    if (minutosTotalesActuales >= abreM && minutosTotalesActuales <= cierraM) {
+    const cierreM = convertirAMinutos(horarios.cierreManana);
+    if (minutosTotalesActuales >= abreM && minutosTotalesActuales < cierreM) {
       return true;
     }
   }
@@ -46,8 +51,8 @@ export const estaAbiertoAhora = (
   // Turno Tarde
   if (horarios.aperturaTarde && horarios.cierreTarde) {
     const abreT = convertirAMinutos(horarios.aperturaTarde);
-    const cierraT = convertirAMinutos(horarios.cierreTarde);
-    if (minutosTotalesActuales >= abreT && minutosTotalesActuales <= cierraT) {
+    const cierreT = convertirAMinutos(horarios.cierreTarde);
+    if (minutosTotalesActuales >= abreT && minutosTotalesActuales < cierreT) {
       return true;
     }
   }

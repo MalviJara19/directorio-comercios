@@ -180,10 +180,13 @@ export default function HomeScreen() {
                   })
                 }
               >
+                {/* Nombre del local */}
                 <Text style={styles.comercio}>{item.nombre}</Text>
+
+                {/* Rubro y Estado formateados (Una sola vez) */}
                 <Text style={styles.rubroTexto}>
-                  {item.rubro.toUpperCase()}{" "}
-                  {abierto ? "• Abierto" : "• Cerrado"}
+                  {item.rubro.charAt(0).toUpperCase() + item.rubro.slice(1)} -{" "}
+                  {abierto ? "Abierto" : "Cerrado"}
                 </Text>
 
                 <Text style={styles.estrellas}>
