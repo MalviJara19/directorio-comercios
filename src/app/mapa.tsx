@@ -1,8 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
+import AppTabs from "@/components/app-tabs";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function MapaScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.titulo}>📍 Mapa</Text>
 
       <Text style={styles.subtitulo}>
@@ -14,7 +16,8 @@ export default function MapaScreen() {
           🗺️ Aquí aparecerá el mapa
         </Text>
       </View>
-    </View>
+      <AppTabs />
+    </SafeAreaView>
   );
 }
 
@@ -23,7 +26,8 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'flex-start',
+    backgroundColor: '#fff',
   },
 
   titulo: {

@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Button,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -11,9 +12,12 @@ import {
   View,
 } from "react-native";
 
+import AppTabs from "@/components/app-tabs";
 import { obtenerComercios } from "@/servicios/serviciosComercios";
+import { cerrarSesion } from "@/servicios/sesion";
 import { Comercio, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
   { label: "Todos", value: "todos" },
@@ -30,6 +34,10 @@ const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
+  const handleCerrarSesion = async () => {
+    await cerrarSesion();
+    router.replace("/auth/login");
+  };
 
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
@@ -94,7 +102,7 @@ export default function HomeScreen() {
   });
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.titulo}>Directorio de Comercios</Text>
       <Text style={styles.subtitulo}>
         Centro Comercial de Concepción del Uruguay
@@ -205,7 +213,10 @@ export default function HomeScreen() {
           }}
         />
       )}
-    </View>
+
+      {/* Barra de navegación inferior */}
+      <AppTabs />
+    </SafeAreaView>
   );
 }
 
@@ -217,7 +228,7 @@ const styles = StyleSheet.create({
     paddingTop: 40,
   },
   titulo: {
-    fontSize: 22,
+    fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
   },

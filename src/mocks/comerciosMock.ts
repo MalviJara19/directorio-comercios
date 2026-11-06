@@ -1,4 +1,4 @@
-import { Comercio } from "../tipos/comercios";
+import { Comercio, Promocion, Resena } from "../tipos/comercios";
 
 export const COMERCIOS_MOCK: Comercio[] = [
   {
@@ -86,5 +86,33 @@ export const COMERCIOS_MOCK: Comercio[] = [
     estaAbiertoPorVacaciones: false,
     promedioEstrellas: 4.9,
     totalResenas: 40,
+  },
+];
+
+export const PROMOCIONES_MOCK: Promocion[] = [
+  {
+    id: "p1",
+    comercioId: "1",
+    titulo: "20% de descuento en fideos",
+    descripcion: "Presentando este cupón los días martes.",
+    descuentoPorcentaje: 20,
+    fechaInicio: "2026-01-01T00:00:00Z",
+    fechaFin: "2026-12-31T23:59:59Z",
+    condiciones: "Válido solo en efectivo.",
+    esExclusivaApp: true,
+    codigoPromo: "DONJOSE20",
+  },
+];
+
+export const RESENAS_MOCK: Resena[] = [
+  {
+    id: "r1",
+    comercioId: "1",
+    usuarioId: "u1",
+    nombreUsuario: "Juan Pérez",
+    estrellas: 5,
+    comentario: "Excelente atención y precios.",
+    fechaCreacion: "2026-03-01T10:00:00Z",
+    respuestaComercio: "¡Muchas gracias Juan!",
   },
 ];

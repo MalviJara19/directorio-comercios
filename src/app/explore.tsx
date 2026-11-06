@@ -1,8 +1,10 @@
 import { StyleSheet, Text, View } from 'react-native';
+import AppTabs from "@/components/app-tabs";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function PromosScreen() {
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <Text style={styles.titulo}>🏷️ Promociones</Text>
 
       <Text style={styles.subtitulo}>
@@ -18,7 +20,8 @@ export default function PromosScreen() {
           Presentando el código de la aplicación.
         </Text>
       </View>
-    </View>
+      <AppTabs />
+    </SafeAreaView>
   );
 }
 
@@ -27,8 +30,9 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     alignItems: 'center',
-    justifyContent: 'center',
-  },
+    justifyContent: 'flex-start',
+    backgroundColor: '#fff',
+},
 
   titulo: {
     fontSize: 28,
