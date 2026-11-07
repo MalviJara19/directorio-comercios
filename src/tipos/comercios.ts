@@ -1,64 +1,64 @@
-// Rubros oficiales pedidos por el Centro Comercial
-export type RubroComercio =
-  | "gastronomia"
-  | "indumentaria"
-  | "hogar"
-  | "ferreteria y construccion"
-  | "salud y farmacia"
-  | "servicios"
-  | "tecnologia"
-  | "libreria"
-  | "otros";
+export interface Coordenadas {
+  latitud: number;
+  longitud: number;
+}
 
-export interface HorarioAtencion {
-  aperturaManana: string | null;
-  cierreManana: string | null;
-  aperturaTarde: string | null;
-  cierreTarde: string | null;
-  atiendeSabados: boolean;
-  cierreSabado: string | null;
+export interface Horario {
+  dia: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = domingo
+  abre: string; // "08:00"
+  cierra: string; // "12:00"
 }
 
 export interface Comercio {
   id: string;
   nombre: string;
-  rubro: RubroComercio;
+  rubroId: string;
   descripcion: string;
   direccion: string;
-  latitud: number;
-  longitud: number;
+  coordenadas: Coordenadas;
   telefono: string | null;
   whatsapp: string | null;
-  redesSociales: string | null;
+  instagram: string | null;
+  imagenes: string[];
+  videoUrl: string | null;
+  horarios: Horario[];
   mediosDePago: string[];
-  fotos: string[];
-  videoPresentacion: string | null;
-  horarios: HorarioAtencion;
-  estaAbiertoPorVacaciones: boolean;
-  promedioEstrellas: number;
-  totalResenas: number;
+  puntaje: number;
+  cantidadResenas: number;
+  codigoQr: string | null;
+  activo: boolean;
+}
+
+export interface Rubro {
+  id: string;
+  nombre: string;
+  icono: string;
+  color: string;
+  orden: number;
 }
 
 export interface Promocion {
   id: string;
   comercioId: string;
   titulo: string;
-  descripcion: string;
-  descuentoPorcentaje: number | null;
-  fechaInicio: string;
-  fechaFin: string;
-  condiciones: string | null;
-  esExclusivaApp: boolean;
-  codigoPromo: string | null;
+  detalle: string;
+  descuento: number | null;
+  desde: string;
+  hasta: string;
+  imagenUrl: string | null;
+  soloApp: boolean;
+  usos: number;
+  activa: boolean;
 }
 
 export interface Resena {
   id: string;
   comercioId: string;
   usuarioId: string;
-  nombreUsuario: string;
-  estrellas: number;
+  estrellas: 1 | 2 | 3 | 4 | 5;
   comentario: string;
-  fechaCreacion: string;
-  respuestaComercio: string | null;
+  respuesta: string | null;
+  reportada: boolean;
+  creadaEn: string;
+  sincronizada: boolean;
 }

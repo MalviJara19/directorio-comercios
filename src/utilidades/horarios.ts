@@ -1,66 +1,18 @@
-import { HorarioAtencion } from "../../directorio-comercios/src/tipos/comercios";
+import { Comercio } from "../tipos/comercios";
 
 export const estaAbiertoAhora = (
-  horarios: HorarioAtencion & { enVacaciones?: boolean },
+  comercio: Comercio,
   fechaActual: Date = new Date(),
 ): boolean => {
-  if (!horarios) return false;
+  // Si el comercio no está activo, está cerrado
+  if (!comercio.activo) return false;
 
-  // 1. REGLA DE VACACIONES: Si está de vacaciones, siempre está cerrado
-  if (horarios.enVacaciones) {
-    return false;
-  }
-
-  const diaSemana = fechaActual.getDay();
-  const horaActual = fechaActual.getHours();
-  const minutosActuales = fechaActual.getMinutes();
-  const minutosTotalesActuales = horaActual * 60 + minutosActuales;
-
-  // 2. Validación para Domingos (0)
-  if (diaSemana === 0) {
-    return false;
-  }
-
-  // 3. Validación para Sábados (6)
-  if (diaSemana === 6) {
-    if (
-      !horarios.atiendeSabados ||
-      !horarios.cierreSabado ||
-      !horarios.aperturaManana
-    ) {
-      return false;
-    }
-
-    const aperturaM = convertirAMinutos(horarios.aperturaManana);
-    const cierreS = convertirAMinutos(horarios.cierreSabado);
-    return (
-      minutosTotalesActuales >= aperturaM && minutosTotalesActuales < cierreS
-    );
-  }
-
-  // 4. Días de semana (Lunes a Viernes: 1 al 5)
-  // Turno Mañana
-  if (horarios.aperturaManana && horarios.cierreManana) {
-    const abreM = convertirAMinutos(horarios.aperturaManana);
-    const cierreM = convertirAMinutos(horarios.cierreManana);
-    if (minutosTotalesActuales >= abreM && minutosTotalesActuales < cierreM) {
-      return true;
-    }
-  }
-
-  // Turno Tarde
-  if (horarios.aperturaTarde && horarios.cierreTarde) {
-    const abreT = convertirAMinutos(horarios.aperturaTarde);
-    const cierreT = convertirAMinutos(horarios.cierreTarde);
-    if (minutosTotalesActuales >= abreT && minutosTotalesActuales < cierreT) {
-      return true;
-    }
-  }
-
-  return false;
-};
-
-const convertirAMinutos = (horaStr: string): number => {
-  const [horas, minutos] = horaStr.split(":").map(Number);
-  return horas * 60 + minutos;
+  const diaActual = fechaActual.getDay() as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+  const hora = String(fechaActual.getHours()).padStart(2, "0");
+  const minutos = String(fechaActual.getMinutes()).padStart(2, "0");
+  const horaActualStr = `${hora}:${minutos}`;
+  return comercio.horarios.some((h) => {
+    if (h.dia !== diaActual) return false;
+    return horaActualStr >= h.abre && horaActualStr < h.cierra;
+  });
 };
