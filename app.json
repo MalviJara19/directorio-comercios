@@ -25,6 +25,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-notifications",
       [
         "expo-splash-screen",
         {
@@ -36,7 +37,9 @@
       "expo-image",
       "expo-web-browser",
       "expo-video",
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-font",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true,

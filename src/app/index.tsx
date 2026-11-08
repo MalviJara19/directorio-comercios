@@ -1,8 +1,9 @@
+
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Button,
+  Alert,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -13,13 +14,32 @@ import {
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
-import { obtenerComercios } from "@/servicios/serviciosComercios";
-import { cerrarSesion } from "@/servicios/sesion";
 import { Comercio, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  agregarFavorito,
+  obtenerComercios as obtenerComerciosAPI,
+  obtenerMiPerfil,
+  quitarFavorito,
+} from "../servicios/api";
 
-const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
+const RUBROS_POR_ID: Record<string, RubroComercio> = {
+  "rub-gastronomia": "gastronomia",
+  "rub-indumentaria": "indumentaria",
+  "rub-hogar": "hogar",
+  "rub-ferreteria": "ferreteria y construccion",
+  "rub-salud": "salud y farmacia",
+  "rub-servicios": "servicios",
+  "rub-tecnologia": "tecnologia",
+  "rub-libreria": "libreria",
+  "rub-otros": "otros",
+};
+
+const LISTA_RUBROS: {
+  label: string;
+  value: RubroComercio | "todos";
+}[] = [
   { label: "Todos", value: "todos" },
   { label: "Gastronomía", value: "gastronomia" },
   { label: "Indumentaria", value: "indumentaria" },
@@ -34,33 +54,157 @@ const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
 
 export default function HomeScreen() {
   const router = useRouter();
-  const handleCerrarSesion = async () => {
-    await cerrarSesion();
-    router.replace("/auth/login");
-  };
 
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
-
   const [busqueda, setBusqueda] = useState<string>("");
   const [rubroSeleccionado, setRubroSeleccionado] = useState<
     RubroComercio | "todos"
   >("todos");
   const [soloAbiertos, setSoloAbiertos] = useState<boolean>(false);
 
+  const [favoritos, setFavoritos] = useState<string[]>([]);
+  const [actualizando, setActualizando] = useState<string[]>([]);
+
   useEffect(() => {
-    async function cargar() {
-      try {
-        const datos = await obtenerComercios();
-        setComercios(datos);
-      } catch (error) {
-        console.error("Error al cargar comercios:", error);
-      } finally {
-        setCargando(false);
-      }
-    }
-    cargar();
+    cargarComercios();
+    cargarFavoritos();
   }, []);
+
+  async function cargarComercios() {
+    try {
+      setCargando(true);
+
+      let todosLosComercios: any[] = [];
+      let pagina = 1;
+      const porPagina = 20;
+      let total = 0;
+
+      do {
+        const respuesta = await obtenerComerciosAPI(pagina, porPagina);
+        const datos = respuesta.datos || [];
+
+        todosLosComercios = [...todosLosComercios, ...datos];
+        total = respuesta.meta?.total || todosLosComercios.length;
+
+        pagina++;
+
+        if (datos.length === 0) {
+          break;
+        }
+      } while (todosLosComercios.length < total);
+
+      const comerciosAdaptados: Comercio[] = todosLosComercios
+        .filter((c) => c.activo !== false)
+        .map((c) => ({
+          id: c.id,
+          nombre: c.nombre,
+          rubro: RUBROS_POR_ID[c.rubroId] || "otros",
+          descripcion: c.descripcion || "",
+          direccion: c.direccion || "",
+
+          latitud: Number(c.coordenadas?.latitud ?? c.latitud ?? 0),
+          longitud: Number(c.coordenadas?.longitud ?? c.longitud ?? 0),
+
+          telefono: c.telefono || null,
+          whatsapp: c.whatsapp || null,
+          redesSociales: c.redesSociales || c.instagram || null,
+
+          mediosDePago: c.mediosDePago || [],
+          fotos: c.fotos || [],
+          videoPresentacion: c.videoPresentacion || null,
+
+          horarios: c.horarios || {
+            aperturaManana: null,
+            cierreManana: null,
+            aperturaTarde: null,
+            cierreTarde: null,
+            atiendeSabados: false,
+            cierreSabado: null,
+          },
+
+          estaAbiertoPorVacaciones: c.estaAbiertoPorVacaciones || false,
+
+          promedioEstrellas: Number(c.puntaje ?? 0),
+          totalResenas: Number(c.cantidadResenas ?? 0),
+        }));
+
+      setComercios(comerciosAdaptados);
+
+      console.log("Comercios reales cargados:", comerciosAdaptados.length);
+    } catch (error) {
+      console.error("Error al cargar comercios reales:", error);
+      Alert.alert("Error", "No se pudieron cargar los comercios.");
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function cargarFavoritos() {
+    try {
+      const perfil = await obtenerMiPerfil();
+
+      const listaFavoritos =
+        perfil?.favoritos ??
+        perfil?.comerciosFavoritos ??
+        [];
+
+      const idsFavoritos = listaFavoritos
+        .map((favorito: any) => {
+          if (typeof favorito === "string") {
+            return favorito;
+          }
+
+          return (
+            favorito.comercioId ??
+            favorito.comercio?.id ??
+            favorito.id
+          );
+        })
+        .filter((id: any) => id);
+
+      setFavoritos(idsFavoritos);
+
+      console.log("Favoritos de Home:", idsFavoritos);
+    } catch (error) {
+      console.log("No se pudieron cargar los favoritos:", error);
+    }
+  }
+
+  async function cambiarFavorito(comercioId: string) {
+    if (actualizando.includes(comercioId)) {
+      return;
+    }
+
+    const yaEsFavorito = favoritos.includes(comercioId);
+
+    try {
+      setActualizando((actuales) => [...actuales, comercioId]);
+
+      if (yaEsFavorito) {
+        await quitarFavorito(comercioId);
+
+        setFavoritos((actuales) =>
+          actuales.filter((id) => id !== comercioId)
+        );
+      } else {
+        await agregarFavorito(comercioId);
+
+        setFavoritos((actuales) => [...actuales, comercioId]);
+      }
+    } catch (error) {
+      console.error("Error al actualizar favorito:", error);
+
+      Alert.alert(
+        "Error",
+        "No se pudo actualizar el favorito. Verificá tu sesión e intentá nuevamente."
+      );
+    } finally {
+      setActualizando((actuales) =>
+        actuales.filter((id) => id !== comercioId)
+      );
+    }
+  }
 
   const quitarAcentos = (texto: string) =>
     texto
@@ -72,14 +216,17 @@ export default function HomeScreen() {
     const busquedaLimpia = quitarAcentos(busqueda);
 
     const coincideNombre = quitarAcentos(comercio.nombre).includes(
-      busquedaLimpia,
+      busquedaLimpia
     );
+
     const coincideRubro = quitarAcentos(comercio.rubro).includes(
-      busquedaLimpia,
+      busquedaLimpia
     );
-    const coincideDireccion = quitarAcentos(comercio.direccion).includes(
-      busquedaLimpia,
-    );
+
+    const coincideDireccion = quitarAcentos(
+      comercio.direccion
+    ).includes(busquedaLimpia);
+
     const coincideDescripcion = comercio.descripcion
       ? quitarAcentos(comercio.descripcion).includes(busquedaLimpia)
       : false;
@@ -91,9 +238,14 @@ export default function HomeScreen() {
       coincideDescripcion;
 
     if (!coincideTexto) return false;
-    if (rubroSeleccionado !== "todos" && comercio.rubro !== rubroSeleccionado) {
+
+    if (
+      rubroSeleccionado !== "todos" &&
+      comercio.rubro !== rubroSeleccionado
+    ) {
       return false;
     }
+
     if (soloAbiertos && !estaAbiertoAhora(comercio.horarios)) {
       return false;
     }
@@ -104,11 +256,11 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.titulo}>Directorio de Comercios</Text>
+
       <Text style={styles.subtitulo}>
         Centro Comercial de Concepción del Uruguay
       </Text>
 
-      {/* 1. Buscador */}
       <TextInput
         style={styles.busqueda}
         placeholder="Buscar en la ciudad..."
@@ -116,23 +268,29 @@ export default function HomeScreen() {
         onChangeText={setBusqueda}
       />
 
-      {/* 2. Filtro horizontal por Rubro */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.rubrosContainer}
-        contentContainerStyle={{ paddingRight: 10 }}
+        contentContainerStyle={styles.rubrosContenido}
       >
         {LISTA_RUBROS.map((r) => {
           const activo = rubroSeleccionado === r.value;
+
           return (
             <TouchableOpacity
               key={r.value}
-              style={[styles.chipRubro, activo && styles.chipRubroActivo]}
+              style={[
+                styles.chipRubro,
+                activo && styles.chipRubroActivo,
+              ]}
               onPress={() => setRubroSeleccionado(r.value)}
             >
               <Text
-                style={[styles.textoChip, activo && styles.textoChipActivo]}
+                style={[
+                  styles.textoChip,
+                  activo && styles.textoChipActivo,
+                ]}
               >
                 {r.label}
               </Text>
@@ -141,9 +299,11 @@ export default function HomeScreen() {
         })}
       </ScrollView>
 
-      {/* 3. Filtro Abierto Ahora */}
       <TouchableOpacity
-        style={[styles.botonAbierto, soloAbiertos && styles.botonAbiertoActivo]}
+        style={[
+          styles.botonAbierto,
+          soloAbiertos && styles.botonAbiertoActivo,
+        ]}
         onPress={() => setSoloAbiertos(!soloAbiertos)}
       >
         <Text
@@ -152,66 +312,98 @@ export default function HomeScreen() {
             soloAbiertos && styles.textoBotonActivo,
           ]}
         >
-          {soloAbiertos ? "✓ Abierto ahora (Filtrando)" : "⏱️ Abierto ahora"}
+          {soloAbiertos
+            ? "✓ Abierto ahora (Filtrando)"
+            : "⏱️ Abierto ahora"}
         </Text>
       </TouchableOpacity>
 
-      {/* Indicador de carga o Listado final */}
       {cargando ? (
         <View style={styles.cargandoContainer}>
           <ActivityIndicator size="large" color="#0a7ea4" />
-          <Text style={styles.textoCargando}>Cargando comercios...</Text>
+          <Text style={styles.textoCargando}>
+            Cargando comercios...
+          </Text>
         </View>
       ) : (
         <FlatList
           data={comerciosFiltrados}
           keyExtractor={(item) => item.id}
           style={{ width: "100%" }}
+          contentContainerStyle={styles.lista}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={styles.vacio}>
-              {soloAbiertos && !busqueda && rubroSeleccionado === "todos"
+              {soloAbiertos &&
+              !busqueda &&
+              rubroSeleccionado === "todos"
                 ? "En este momento todos los comercios están cerrados."
                 : "No se encontraron comercios que coincidan con la búsqueda."}
             </Text>
           }
           renderItem={({ item }) => {
             const abierto = estaAbiertoAhora(item.horarios);
+            const esFavorito = favoritos.includes(item.id);
+            const estaActualizando = actualizando.includes(item.id);
+
             return (
-              <TouchableOpacity
-                style={styles.card}
-                activeOpacity={0.7}
-                onPress={() =>
-                  router.push({
-                    pathname: "/comercio/[id]",
-                    params: { id: item.id },
-                  })
-                }
-              >
-                <Text style={styles.comercio}>{item.nombre}</Text>
-                <Text style={styles.rubroTexto}>
-                  {item.rubro.toUpperCase()}{" "}
-                  {abierto ? "• Abierto" : "• Cerrado"}
-                </Text>
+              <View style={styles.card}>
+                <TouchableOpacity
+                  style={styles.infoComercio}
+                  activeOpacity={0.7}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/comercio/[id]",
+                      params: { id: item.id },
+                    })
+                  }
+                >
+                  <Text style={styles.comercio}>
+                    {item.nombre}
+                  </Text>
 
-                <Text style={styles.estrellas}>
-                  ⭐ {item.promedioEstrellas} estrellas ({item.totalResenas})
-                </Text>
+                  <Text style={styles.rubroTexto}>
+                    {item.rubro.toUpperCase()}{" "}
+                    {abierto ? "• Abierto" : "• Cerrado"}
+                  </Text>
 
-                {item.estaAbiertoPorVacaciones && (
-                  <View style={styles.vacacionesBadge}>
-                    <Text style={styles.vacacionesText}>
-                      🏖️ Cerrado por vacaciones
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                  <Text style={styles.estrellas}>
+                    ⭐ {item.promedioEstrellas} estrellas (
+                    {item.totalResenas})
+                  </Text>
+
+                  {item.estaAbiertoPorVacaciones && (
+                    <View style={styles.vacacionesBadge}>
+                      <Text style={styles.vacacionesText}>
+                        🏖️ Cerrado por vacaciones
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.botonFavorito}
+                  onPress={() => cambiarFavorito(item.id)}
+                  disabled={estaActualizando}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.corazon,
+                      {
+                        color: esFavorito ? "#e53935" : "#777777",
+                      },
+                    ]}
+                  >
+                    {estaActualizando ? "..." : esFavorito ? "♥" : "♡"}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             );
           }}
         />
       )}
 
-      {/* Barra de navegación inferior */}
       <AppTabs />
     </SafeAreaView>
   );
@@ -224,71 +416,98 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     paddingTop: 40,
   },
+
   titulo: {
     fontSize: 28,
     fontWeight: "bold",
     textAlign: "center",
   },
+
   subtitulo: {
     fontSize: 13,
     color: "#666",
     textAlign: "center",
     marginBottom: 12,
   },
+
   busqueda: {
     width: "100%",
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
-    padding: 10,
-    fontSize: 15,
-    marginBottom: 10,
+    padding: 12,
+    fontSize: 16,
+    marginBottom: 12,
   },
+
   rubrosContainer: {
-    maxHeight: 38,
-    marginBottom: 10,
+    height: 52,
+    maxHeight: 52,
+    marginBottom: 12,
+    flexGrow: 0,
   },
+
+  rubrosContenido: {
+    alignItems: "center",
+    paddingRight: 10,
+  },
+
   chipRubro: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
     backgroundColor: "#f0f0f0",
     marginRight: 8,
     borderWidth: 1,
     borderColor: "#ddd",
+    justifyContent: "center",
   },
+
   chipRubroActivo: {
     backgroundColor: "#0a7ea4",
     borderColor: "#0a7ea4",
   },
+
   textoChip: {
-    fontSize: 12,
+    fontSize: 14,
     color: "#333",
+    fontWeight: "500",
   },
+
   textoChipActivo: {
     color: "#fff",
     fontWeight: "bold",
   },
+
   botonAbierto: {
     width: "100%",
     borderWidth: 1,
     borderColor: "#0a7ea4",
-    padding: 8,
-    borderRadius: 8,
-    marginBottom: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginBottom: 14,
     alignItems: "center",
     backgroundColor: "#f4f9fb",
   },
+
   botonAbiertoActivo: {
     backgroundColor: "#0a7ea4",
   },
+
   textoBotonAbierto: {
     color: "#0a7ea4",
     fontWeight: "600",
+    fontSize: 14,
   },
+
   textoBotonActivo: {
     color: "#fff",
   },
+
+  lista: {
+    paddingBottom: 100,
+  },
+
   card: {
     width: "100%",
     padding: 14,
@@ -297,41 +516,69 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "#e0e0e0",
+    flexDirection: "row",
+    alignItems: "center",
   },
+
+  infoComercio: {
+    flex: 1,
+  },
+
   comercio: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#111",
   },
+
   rubroTexto: {
     fontSize: 13,
     color: "#555",
     marginTop: 2,
   },
+
   estrellas: {
     fontSize: 13,
     color: "#444",
     marginTop: 2,
   },
+
   vacacionesBadge: {
     marginTop: 6,
     backgroundColor: "#fff3e0",
     padding: 4,
     borderRadius: 4,
   },
+
   vacacionesText: {
     fontSize: 12,
     color: "#e65100",
   },
+
+  botonFavorito: {
+    width: 48,
+    height: 48,
+    marginLeft: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  corazon: {
+    fontSize: 32,
+    fontWeight: "bold",
+    includeFontPadding: false,
+  },
+
   cargandoContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
+
   textoCargando: {
     marginTop: 8,
     color: "#666",
   },
+
   vacio: {
     textAlign: "center",
     color: "#777",

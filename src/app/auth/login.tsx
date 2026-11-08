@@ -9,24 +9,23 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { iniciarSesion } from "../../servicios/api";
 import { guardarToken, guardarUsuario } from "../../servicios/sesion";
-
+import { registrarDispositivoParaNotificaciones } from "../../servicios/notificaciones";
 
 export default function Login() {
   const router = useRouter();
+
   const [email, setEmail] = useState<string>("");
-  const [contraseña, setcontraseña] = useState<string>("");
-  const [error, setError] = useState<string | null>(null);
+  const [contrasena, setContrasena] = useState<string>("");
 
   const handleLogin = async () => {
-    console.log("Se presionó el botón de iniciar sesión");
-    if (!email.trim() || !contraseña) {
-      Alert.alert("error", "Por favor, complete todos los campos requeridos");
+    if (!email.trim() || !contrasena) {
+      Alert.alert("Error", "Por favor, completá todos los campos requeridos.");
       return;
     }
 
-    //  Comprobar el formato del correo
     const formatoEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     if (!formatoEmail.test(email.trim())) {
@@ -34,8 +33,7 @@ export default function Login() {
       return;
     }
 
-    // Comprobar la longitud
-    if (contraseña.length < 8) {
+    if (contrasena.length < 8) {
       Alert.alert(
         "Contraseña inválida",
         "La contraseña debe tener al menos 8 caracteres.",
@@ -43,51 +41,54 @@ export default function Login() {
       return;
     }
 
-    // Conectar con la API
     try {
-      const respuesta = await iniciarSesion(email.trim(), contraseña);
+      const respuesta = await iniciarSesion(email.trim(), contrasena);
 
-// Guardar el token de autenticación
-await guardarToken(respuesta.datos.token);
+      // Guardar la sesión.
+      await guardarToken(respuesta.datos.token);
+      await guardarUsuario(respuesta.datos.usuario);
 
-// Guardar los datos del usuario
-await guardarUsuario(respuesta.datos.usuario);
+      console.log("Usuario autenticado:", respuesta.datos.usuario);
 
-console.log("Usuario autenticado:", respuesta.datos.usuario);
+      // Registrar el dispositivo para recibir notificaciones.
+      await registrarDispositivoParaNotificaciones();
 
-Alert.alert(
-  "¡Bienvenido!",
-  `Hola ${respuesta.datos.usuario.nombre}`,
-);
+      Alert.alert(
+        "¡Bienvenido!",
+        `Hola ${respuesta.datos.usuario.nombre}`,
+      );
 
-const rol = respuesta.datos.usuario.rol;
+      const rol = respuesta.datos.usuario.rol;
 
-if (rol === "vecino") {
-  router.replace("/");
-} else if (rol === "comercio") {
-  router.replace("/perfiles/comercio");
-} else {
-  Alert.alert("Error", "No se pudo identificar el tipo de usuario.");
-}
+      if (rol === "vecino") {
+        router.replace("/");
+      } else if (rol === "comercio") {
+        router.replace("/perfiles/comercio");
+      } else {
+        Alert.alert("Error", "No se pudo identificar el tipo de usuario.");
+      }
+    } catch (error: any) {
+      console.log(
+        "Error al iniciar sesión:",
+        error.response?.data || error.message,
+      );
 
-} catch (error: any) {
-  console.log("Error al iniciar sesión:", error.response?.data || error.message);
+      const mensaje =
+        error.response?.data?.mensaje ||
+        error.response?.data?.message ||
+        "No se pudo conectar con el servidor. Intentá nuevamente.";
 
-  const mensaje =
-    error.response?.data?.mensaje ||
-    error.response?.data?.message ||
-    "No se pudo conectar con el servidor. Intentá nuevamente.";
-
-  Alert.alert("Error al iniciar sesión", mensaje);
-}
+      Alert.alert("Error al iniciar sesión", mensaje);
+    }
   };
 
-  // pantalla de inicio de sesion
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Directorio de Comercios</Text>
-        <Text style={styles.subtitle}> Ingresá a tu cuenta </Text>
+
+        <Text style={styles.subtitle}>Ingresá a tu cuenta</Text>
+
         <Text style={styles.label}>Correo electrónico</Text>
 
         <TextInput
@@ -96,8 +97,8 @@ if (rol === "vecino") {
           value={email}
           onChangeText={setEmail}
           keyboardType="email-address"
-          autoCapitalize="none" //desactivar mayusculas
-          autoCorrect={false} //autorrector false
+          autoCapitalize="none"
+          autoCorrect={false}
         />
 
         <Text style={styles.label}>Contraseña</Text>
@@ -105,8 +106,8 @@ if (rol === "vecino") {
         <TextInput
           style={styles.input}
           placeholder="Ingresá tu contraseña"
-          value={contraseña}
-          onChangeText={setcontraseña}
+          value={contrasena}
+          onChangeText={setContrasena}
           secureTextEntry
           autoCapitalize="none"
         />
@@ -116,7 +117,9 @@ if (rol === "vecino") {
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>¿Todavía no tenés una cuenta?</Text>
+          <Text style={styles.registerText}>
+            ¿Todavía no tenés una cuenta?
+          </Text>
 
           <Link href="/auth/registro" style={styles.registerLink}>
             Registrarme

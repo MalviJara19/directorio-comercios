@@ -1,64 +1,79 @@
-// Rubros oficiales pedidos por el Centro Comercial
-export type RubroComercio =
-  | "gastronomia"
-  | "indumentaria"
-  | "hogar"
-  | "ferreteria y construccion"
-  | "salud y farmacia"
-  | "servicios"
-  | "tecnologia"
-  | "libreria"
-  | "otros";
-
-export interface HorarioAtencion {
-  aperturaManana: string | null;
-  cierreManana: string | null;
-  aperturaTarde: string | null;
-  cierreTarde: string | null;
-  atiendeSabados: boolean;
-  cierreSabado: string | null;
+// Coordenadas geográficas de un comercio
+export interface Coordenadas {
+  latitud: number;
+  longitud: number;
 }
 
+// Horarios de atención
+export interface Horario {
+  dia: 0 | 1 | 2 | 3 | 4 | 5 | 6; // 0 = domingo
+  abre: string; // Ejemplo: "08:00"
+  cierra: string; // Ejemplo: "12:00"
+}
+
+// Información de un comercio
 export interface Comercio {
   id: string;
   nombre: string;
-  rubro: RubroComercio;
+  rubroId: string;
   descripcion: string;
   direccion: string;
-  latitud: number;
-  longitud: number;
+  coordenadas: Coordenadas;
   telefono: string | null;
   whatsapp: string | null;
-  redesSociales: string | null;
+  instagram: string | null;
+  imagenes: string[];
+  videoUrl: string | null;
+  horarios: Horario[];
   mediosDePago: string[];
-  fotos: string[];
-  videoPresentacion: string | null;
-  horarios: HorarioAtencion;
-  estaAbiertoPorVacaciones: boolean;
-  promedioEstrellas: number;
-  totalResenas: number;
+  puntaje: number;
+  cantidadResenas: number;
+  codigoQr: string | null;
+  activo: boolean;
 }
 
+// Rubros de comercios
+export interface Rubro {
+  id: string;
+  nombre: string;
+  icono: string;
+  color: string;
+  orden: number;
+}
+
+// Promociones
 export interface Promocion {
   id: string;
   comercioId: string;
   titulo: string;
-  descripcion: string;
-  descuentoPorcentaje: number | null;
-  fechaInicio: string;
-  fechaFin: string;
-  condiciones: string | null;
-  esExclusivaApp: boolean;
-  codigoPromo: string | null;
+  detalle: string;
+  descuento: number | null;
+  desde: string;
+  hasta: string;
+  imagenUrl: string | null;
+  soloApp: boolean;
+  usos: number;
+  activa: boolean;
 }
 
+// Reseñas
 export interface Resena {
   id: string;
   comercioId: string;
   usuarioId: string;
-  nombreUsuario: string;
-  estrellas: number;
+  estrellas: 1 | 2 | 3 | 4 | 5;
   comentario: string;
-  fechaCreacion: string;
-  respuestaComercio: string | null;
+  respuesta: string | null;
+  reportada: boolean;
+  creadaEn: string;
+  sincronizada: boolean;
+}
+
+// Registro de uso de una promoción
+export interface UsoDePromocion {
+  id: string;
+  promocionId: string;
+  usuarioId: string;
+  codigo: string;
+  validadoEn: string | null;
 }

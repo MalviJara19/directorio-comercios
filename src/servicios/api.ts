@@ -1,8 +1,9 @@
+
 import axios from "axios";
 import { obtenerToken } from "./sesion";
 
 export const api = axios.create({
-  baseURL: "http://192.168.1.240:3000",
+  baseURL: "http://192.168.1.68:3000",
   headers: {
     "Content-Type": "application/json",
   },
@@ -41,5 +42,53 @@ export async function actualizarMiComercio(datos: {
   instagram: string | null;
 }) {
   const respuesta = await api.patch("/mi-comercio", datos);
+  return respuesta.data.datos;
+}
+
+export async function obtenerComercios(pagina = 1, porPagina = 20) {
+  const respuesta = await api.get("/comercios", {
+    params: { pagina, porPagina },
+  });
+
+  return respuesta.data;
+}
+
+export async function obtenerRubros() {
+  const respuesta = await api.get("/rubros");
+  return respuesta.data.datos;
+}
+export async function agregarFavorito(comercioId: string) {
+  const respuesta = await api.put(
+    `/yo/favoritos/${comercioId}`
+  );
+
+  return respuesta.data;
+}
+
+export async function quitarFavorito(comercioId: string) {
+  const respuesta = await api.delete(
+    `/yo/favoritos/${comercioId}`
+  );
+
+  return respuesta.data;
+}
+
+export async function obtenerMiPerfil() {
+  const respuesta = await api.get("/yo");
+
+  return respuesta.data.datos;
+}
+export async function actualizarRubrosDeInteres(rubrosDeInteres: string[]) {
+  const respuesta = await api.patch("/yo", {
+    rubrosDeInteres,
+  });
+
+  return respuesta.data.datos;
+}
+export async function actualizarAvisosActivos(avisosActivos: boolean) {
+  const respuesta = await api.patch("/yo", {
+    avisosActivos,
+  });
+
   return respuesta.data.datos;
 }

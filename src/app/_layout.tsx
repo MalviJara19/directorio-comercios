@@ -18,13 +18,10 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <StatusBar
-        backgroundColor="#FFFFFF"
-        barStyle="dark-content"
-      />
+      <StatusBar barStyle="dark-content" />
       <AnimatedSplashOverlay />
 
-      <Stack initialRouteName="bienvenida" screenOptions={{ headerShown: false }}>
+      <Stack screenOptions={{ headerShown: false }}>
         
         <Stack.Screen
           name="bienvenida"
