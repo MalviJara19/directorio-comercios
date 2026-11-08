@@ -2,7 +2,6 @@ import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Button,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -11,25 +10,25 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import AppTabs from "@/components/app-tabs";
 import { obtenerComercios } from "@/servicios/serviciosComercios";
 import { cerrarSesion } from "@/servicios/sesion";
-import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { Comercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
-import { SafeAreaView } from "react-native-safe-area-context";
 
-const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
+const LISTA_RUBROS: { label: string; value: string }[] = [
   { label: "Todos", value: "todos" },
-  { label: "Gastronomía", value: "gastronomia" },
-  { label: "Indumentaria", value: "indumentaria" },
-  { label: "Hogar", value: "hogar" },
-  { label: "Ferretería y Constr.", value: "ferreteria y construccion" },
-  { label: "Salud y Farmacia", value: "salud y farmacia" },
-  { label: "Servicios", value: "servicios" },
-  { label: "Tecnología", value: "tecnologia" },
-  { label: "Librería", value: "libreria" },
-  { label: "Otros", value: "otros" },
+  { label: "Gastronomía", value: "rub-gastronomia" },
+  { label: "Indumentaria", value: "rub-indumentaria" },
+  { label: "Hogar", value: "rub-hogar" },
+  { label: "Ferretería y Constr.", value: "rub-ferreteria" },
+  { label: "Salud y Farmacia", value: "rub-salud" },
+  { label: "Servicios", value: "rub-servicios" },
+  { label: "Tecnología", value: "rub-tecnologia" },
+  { label: "Librería", value: "rub-libreria" },
+  { label: "Otros", value: "rub-otros" },
 ];
 
 export default function HomeScreen() {
@@ -43,9 +42,7 @@ export default function HomeScreen() {
   const [cargando, setCargando] = useState<boolean>(true);
 
   const [busqueda, setBusqueda] = useState<string>("");
-  const [rubroSeleccionado, setRubroSeleccionado] = useState<
-    RubroComercio | "todos"
-  >("todos");
+  const [rubroSeleccionado, setRubroSeleccionado] = useState<string>("todos");
   const [soloAbiertos, setSoloAbiertos] = useState<boolean>(false);
 
   useEffect(() => {
@@ -62,19 +59,22 @@ export default function HomeScreen() {
     cargar();
   }, []);
 
-  const quitarAcentos = (texto: string) =>
-    texto
+  const quitarAcentos = (texto: string | null | undefined) => {
+    if (!texto || typeof texto !== "string") return "";
+    return texto
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
+  };
 
   const comerciosFiltrados = comercios.filter((comercio) => {
     const busquedaLimpia = quitarAcentos(busqueda);
 
+    // 1. Buscador libre
     const coincideNombre = quitarAcentos(comercio.nombre).includes(
       busquedaLimpia,
     );
-    const coincideRubro = quitarAcentos(comercio.rubro).includes(
+    const coincideRubro = quitarAcentos(comercio.rubroId).includes(
       busquedaLimpia,
     );
     const coincideDireccion = quitarAcentos(comercio.direccion).includes(
@@ -85,15 +85,32 @@ export default function HomeScreen() {
       : false;
 
     const coincideTexto =
+      !busqueda ||
       coincideNombre ||
       coincideRubro ||
       coincideDireccion ||
       coincideDescripcion;
 
     if (!coincideTexto) return false;
-    if (rubroSeleccionado !== "todos" && comercio.rubro !== rubroSeleccionado) {
-      return false;
+
+    // 2. Filtro estricto por Rubro
+    if (rubroSeleccionado !== "todos") {
+      const rubroLimpioComercio = quitarAcentos(comercio.rubroId);
+      const rubroLimpioFiltro = quitarAcentos(
+        rubroSeleccionado.replace("rub-", ""),
+      );
+
+      const esMismoId = comercio.rubroId === rubroSeleccionado;
+      const coincidePalabraClave =
+        rubroLimpioComercio === rubroLimpioFiltro ||
+        rubroLimpioComercio === `rub-${rubroLimpioFiltro}`;
+
+      if (!esMismoId && !coincidePalabraClave) {
+        return false;
+      }
     }
+
+    // 3. Filtro Abierto Ahora
     if (soloAbiertos && !estaAbiertoAhora(comercio.horarios)) {
       return false;
     }
@@ -177,6 +194,7 @@ export default function HomeScreen() {
           }
           renderItem={({ item }) => {
             const abierto = estaAbiertoAhora(item.horarios);
+            const esVacaciones = item.horarios.length === 0;
             return (
               <TouchableOpacity
                 style={styles.card}
@@ -191,17 +209,16 @@ export default function HomeScreen() {
                 {/* Nombre del local */}
                 <Text style={styles.comercio}>{item.nombre}</Text>
 
-                {/* Rubro y Estado formateados (Una sola vez) */}
+                {/* Rubro y Estado formateados */}
                 <Text style={styles.rubroTexto}>
-                  {item.rubro.charAt(0).toUpperCase() + item.rubro.slice(1)} -{" "}
-                  {abierto ? "Abierto" : "Cerrado"}
+                  {item.rubroId} - {abierto ? "Abierto" : "Cerrado"}
                 </Text>
 
                 <Text style={styles.estrellas}>
-                  ⭐ {item.promedioEstrellas} estrellas ({item.totalResenas})
+                  ⭐ {item.puntaje} estrellas ({item.cantidadResenas})
                 </Text>
 
-                {item.estaAbiertoPorVacaciones && (
+                {esVacaciones && (
                   <View style={styles.vacacionesBadge}>
                     <Text style={styles.vacacionesText}>
                       🏖️ Cerrado por vacaciones
@@ -248,17 +265,21 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   rubrosContainer: {
-    maxHeight: 38,
-    marginBottom: 10,
+    minHeight: 45,
+    maxHeight: 50,
+    marginBottom: 12,
   },
   chipRubro: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
     backgroundColor: "#f0f0f0",
     marginRight: 8,
     borderWidth: 1,
     borderColor: "#ddd",
+    justifyContent: "center",
+    alignItems: "center",
+    height: 38,
   },
   chipRubroActivo: {
     backgroundColor: "#0a7ea4",

@@ -5,16 +5,76 @@ import {
   ActivityIndicator,
   Image,
   Linking,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { obtenerComercioPorId } from "@/servicios/serviciosComercios";
-import { Comercio } from "@/tipos/comercios";
+import { Comercio, Horario } from "@/tipos/comercios";
+import { estaAbiertoAhora } from "@/utilidades/horarios";
+
+const NOMBRES_DIAS = [
+  "Domingo",
+  "Lunes",
+  "Martes",
+  "Miércoles",
+  "Jueves",
+  "Viernes",
+  "Sábado",
+];
+
+// Función auxiliar para asegurar que las URLs de imágenes o videos apunten correctamente al backend si son relativas
+function obtenerUrlCompleta(url: string | undefined): string {
+  if (!url) return "";
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  // Si viene con barra inicial o sin ella, lo unimos al puerto 3000 del backend local
+  const baseUrl = "http://localhost:3000";
+  return url.startsWith("/") ? `${baseUrl}${url}` : `${baseUrl}/${url}`;
+}
+
+function ReproductorVideo({ videoUrl }: { videoUrl: string }) {
+  const urlFinal = obtenerUrlCompleta(videoUrl);
+  const player = useVideoPlayer(urlFinal, (player) => {
+    player.loop = false;
+  });
+
+  return (
+    <View style={styles.seccion}>
+      <Text style={styles.seccionTitulo}>📹 Video de presentación</Text>
+      <VideoView
+        style={styles.video}
+        player={player}
+        allowsFullscreen
+        allowsPictureInPicture
+      />
+    </View>
+  );
+}
+
+function agruparHorariosPorDia(horarios: Horario[]) {
+  const mapa: { [key: number]: string[] } = {};
+
+  horarios.forEach((h) => {
+    if (!mapa[h.dia]) {
+      mapa[h.dia] = [];
+    }
+    mapa[h.dia].push(`${h.abre} a ${h.cierra} hs`);
+  });
+
+  return Object.keys(mapa)
+    .map(Number)
+    .sort((a, b) => (a === 0 ? 7 : a) - (b === 0 ? 7 : b))
+    .map((diaNum) => ({
+      nombreDia: NOMBRES_DIAS[diaNum],
+      turnos: mapa[diaNum].join(" / "),
+    }));
+}
 
 export default function DetalleComercioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -24,232 +84,312 @@ export default function DetalleComercioScreen() {
   const [cargando, setCargando] = useState<boolean>(true);
 
   useEffect(() => {
-    async function cargarDetalle() {
+    async function cargar() {
       if (!id) return;
       try {
         const datos = await obtenerComercioPorId(id);
+        console.log("Comercio cargado exitosamente:", datos);
+        console.log("Imágenes del comercio:", datos?.imagenes);
+        console.log("Video URL del comercio:", datos?.videoUrl);
         setComercio(datos);
       } catch (error) {
-        console.error("Error al cargar el detalle del comercio:", error);
+        console.error("Error al obtener detalle del comercio:", error);
       } finally {
         setCargando(false);
       }
     }
-    cargarDetalle();
+    cargar();
   }, [id]);
 
-  // Instanciamos el reproductor directamente con la URL (o vacío en web)
-  const player = useVideoPlayer(
-    Platform.OS === "web" ? "" : (comercio?.videoPresentacion ?? ""),
-    (p) => {
-      p.loop = true;
-    },
-  );
+  const volverAlListado = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace("/");
+    }
+  };
 
   if (cargando) {
     return (
-      <View style={styles.centrado}>
+      <SafeAreaView style={styles.center}>
         <ActivityIndicator size="large" color="#0a7ea4" />
-        <Text style={{ marginTop: 8 }}>Cargando ficha del comercio...</Text>
-      </View>
+        <Text style={{ marginTop: 10 }}>Cargando datos del comercio...</Text>
+      </SafeAreaView>
     );
   }
 
   if (!comercio) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.center}>
         <Text style={styles.errorText}>No se encontró el comercio.</Text>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.botonVolver}
-        >
-          <Text style={styles.textoVolver}>← Volver</Text>
+        <TouchableOpacity style={styles.botonVolver} onPress={volverAlListado}>
+          <Text style={styles.textoBotonVolver}>← Volver al inicio</Text>
         </TouchableOpacity>
-      </View>
+      </SafeAreaView>
     );
   }
 
+  const abierto = estaAbiertoAhora(comercio.horarios);
+  const horariosAgrupados = comercio.horarios
+    ? agruparHorariosPorDia(comercio.horarios)
+    : [];
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Botón Volver */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={styles.botonVolver}
+    <SafeAreaView style={styles.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        <Text style={styles.textoVolver}>← Volver al listado</Text>
-      </TouchableOpacity>
-
-      {/* Encabezado Ficha */}
-      <Text style={styles.titulo}>{comercio.nombre}</Text>
-      <Text style={styles.subTituloInfo}>
-        {comercio.rubro.toUpperCase()} • {comercio.direccion}
-      </Text>
-      <Text style={styles.estrellasDetalle}>
-        ⭐ {comercio.promedioEstrellas} ({comercio.totalResenas} reseñas)
-      </Text>
-
-      {/* Video de presentación */}
-      {comercio.videoPresentacion && Platform.OS !== "web" ? (
-        <View style={styles.seccionVideo}>
-          <Text style={styles.tituloVideo}>🎥 Video de Presentación (30s)</Text>
-          <VideoView
-            player={player}
-            style={styles.video}
-            nativeControls={true}
-            allowsFullscreen
-            allowsPictureInPicture
-          />
-        </View>
-      ) : comercio.videoPresentacion && Platform.OS === "web" ? (
-        <View style={styles.seccionVideo}>
-          <Text style={styles.tituloVideo}>🎥 Video de Presentación (30s)</Text>
-          <Text style={styles.avisoWeb}>
-            (El reproductor de video nativo se ejecuta en dispositivos móviles /
-            Expo Go).
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Botones de acción rápida: Llamar, WhatsApp, Redes, Ir (Mapa) */}
-      <View style={styles.botonesContacto}>
-        {comercio.telefono && (
-          <TouchableOpacity
-            style={styles.botonAccion}
-            onPress={() => Linking.openURL(`tel:${comercio.telefono}`)}
-          >
-            <Text style={styles.textoBoton}>📞 Llamar</Text>
-          </TouchableOpacity>
-        )}
-
-        {comercio.whatsapp && (
-          <TouchableOpacity
-            style={[styles.botonAccion, styles.botonWhatsapp]}
-            onPress={() => {
-              const numeroLimpio = comercio.whatsapp?.replace(/\D/g, "") || "";
-              const urlWhatsapp = `https://api.whatsapp.com/send?phone=${numeroLimpio}`;
-
-              Linking.openURL(urlWhatsapp).catch((err) =>
-                console.error("Error al abrir WhatsApp:", err),
-              );
-            }}
-          >
-            <Text style={styles.textoBoton}>💬 WhatsApp</Text>
-          </TouchableOpacity>
-        )}
-
-        {comercio.redesSociales && (
-          <TouchableOpacity
-            style={[styles.botonAccion, styles.botonRedes]}
-            onPress={() => {
-              const usuario = comercio.redesSociales?.replace("@", "") || "";
-              const urlRed = `https://instagram.com/${usuario}`;
-              Linking.openURL(urlRed).catch((err) =>
-                console.error("Error al abrir redes sociales:", err),
-              );
-            }}
-          >
-            <Text style={styles.textoBoton}>🌐 Redes</Text>
-          </TouchableOpacity>
-        )}
-
-        <TouchableOpacity
-          style={[styles.botonAccion, styles.botonIr]}
-          onPress={() => {
-            const url = `https://www.google.com/maps/search/?api=1&query=${comercio.latitud},${comercio.longitud}`;
-            Linking.openURL(url);
-          }}
-        >
-          <Text style={styles.textoBoton}>📍 Ir</Text>
+        {/* Barra superior con botón volver */}
+        <TouchableOpacity style={styles.backBtn} onPress={volverAlListado}>
+          <Text style={styles.backText}>← Volver al listado</Text>
         </TouchableOpacity>
-      </View>
 
-      {/* Galería de Fotos del local */}
-      {comercio.fotos && comercio.fotos.length > 0 ? (
-        <View style={styles.seccion}>
-          <Text style={styles.subtituloSeccion}>🖼️ Fotos del local</Text>
+        {/* Galería de Imágenes (Solo si existen) */}
+        {comercio.imagenes && comercio.imagenes.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            style={styles.contenedorFotos}
+            style={styles.galeria}
           >
-            {comercio.fotos.map((fotoUrl, index) => (
+            {comercio.imagenes.map((img, idx) => (
               <Image
-                key={index}
-                source={{ uri: fotoUrl }}
-                style={styles.miniaturaFoto}
+                key={idx}
+                source={{ uri: obtenerUrlCompleta(img) }}
+                style={styles.imagen}
               />
             ))}
           </ScrollView>
+        )}
+
+        {/* Encabezado Principal */}
+        <View style={styles.headerInfo}>
+          <Text style={styles.nombre}>{comercio.nombre}</Text>
+          <Text style={styles.subtituloHeader}>
+            {comercio.rubroId} • {comercio.direccion}
+          </Text>
+
+          <View style={styles.estadoContainer}>
+            <Text
+              style={[
+                styles.badgeEstado,
+                abierto ? styles.abierto : styles.cerrado,
+              ]}
+            >
+              {abierto ? "🟢 ABIERTO AHORA" : "🔴 CERRADO"}
+            </Text>
+            <Text style={styles.estrellas}>
+              ⭐ {comercio.puntaje} ({comercio.cantidadResenas} reseñas)
+            </Text>
+          </View>
         </View>
-      ) : null}
 
-      {/* Información general */}
-      <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>📄 Descripción</Text>
-        <Text style={styles.texto}>{comercio.descripcion}</Text>
-      </View>
+        {/* Descripción */}
+        <View style={styles.seccion}>
+          <Text style={styles.seccionTitulo}>📄 Descripción</Text>
+          <Text style={styles.descripcionText}>
+            {comercio.descripcion ||
+              "Este comercio no ha agregado una descripción todavía."}
+          </Text>
+        </View>
 
-      <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>💳 Medios de pago aceptados</Text>
-        <Text style={styles.texto}>{comercio.mediosDePago.join(", ")}</Text>
-      </View>
-    </ScrollView>
+        {/* Video de presentación */}
+        {comercio.videoUrl ? (
+          <ReproductorVideo videoUrl={comercio.videoUrl} />
+        ) : null}
+
+        {/* Botones de Contacto Rápido */}
+        {(comercio.telefono || comercio.whatsapp || comercio.instagram) && (
+          <View style={styles.seccion}>
+            <Text style={styles.seccionTitulo}>📞 Contacto e Interacción</Text>
+            <View style={styles.botonesAccion}>
+              {comercio.telefono && (
+                <TouchableOpacity
+                  style={[styles.btnAccion, { backgroundColor: "#0a7ea4" }]}
+                  onPress={() => Linking.openURL(`tel:${comercio.telefono}`)}
+                >
+                  <Text style={styles.btnAccionTexto}>📞 Llamar</Text>
+                </TouchableOpacity>
+              )}
+
+              {comercio.whatsapp && (
+                <TouchableOpacity
+                  style={[styles.btnAccion, { backgroundColor: "#25D366" }]}
+                  onPress={() =>
+                    Linking.openURL(`https://wa.me/${comercio.whatsapp}`)
+                  }
+                >
+                  <Text style={styles.btnAccionTexto}>💬 WhatsApp</Text>
+                </TouchableOpacity>
+              )}
+
+              {comercio.instagram && (
+                <TouchableOpacity
+                  style={[styles.btnAccion, { backgroundColor: "#C13584" }]}
+                  onPress={() =>
+                    Linking.openURL(
+                      `https://instagram.com/${comercio.instagram.replace("@", "")}`,
+                    )
+                  }
+                >
+                  <Text style={styles.btnAccionTexto}>📸 Instagram</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Horarios de Atención */}
+        <View style={styles.seccion}>
+          <Text style={styles.seccionTitulo}>⏱️ Horarios de Atención</Text>
+          {horariosAgrupados.length > 0 ? (
+            horariosAgrupados.map((item, i) => (
+              <View key={i} style={styles.filaHorario}>
+                <Text style={styles.diaTexto}>{item.nombreDia}:</Text>
+                <Text style={styles.turnosTexto}>{item.turnos}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.horarioVacio}>
+              🏖️ Cerrado por vacaciones o sin horarios informados.
+            </Text>
+          )}
+        </View>
+
+        {/* Medios de Pago */}
+        <View style={styles.seccion}>
+          <Text style={styles.seccionTitulo}>💳 Medios de Pago Aceptados</Text>
+          <View style={styles.chipsContainer}>
+            {comercio.mediosDePago && comercio.mediosDePago.length > 0 ? (
+              comercio.mediosDePago.map((medio, idx) => (
+                <View key={idx} style={styles.chipPago}>
+                  <Text style={styles.chipPagoTexto}>
+                    {medio === "efectivo"
+                      ? "💵"
+                      : medio === "debito" || medio === "credito"
+                        ? "💳"
+                        : "📱"}{" "}
+                    {medio.toUpperCase()}
+                  </Text>
+                </View>
+              ))
+            ) : (
+              <Text style={{ color: "#777" }}>
+                No especifica medios de pago.
+              </Text>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     backgroundColor: "#fff",
-    paddingTop: 50,
   },
-  centrado: {
+  scrollContent: {
+    padding: 16,
+  },
+  center: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
   },
-  botonVolver: {
+  errorText: {
+    fontSize: 16,
+    color: "#c00",
     marginBottom: 12,
   },
-  textoVolver: {
+  botonVolver: {
+    backgroundColor: "#0a7ea4",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  textoBotonVolver: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  backBtn: {
+    alignSelf: "flex-start",
+    paddingVertical: 6,
+    paddingRight: 12,
+    marginBottom: 12,
+  },
+  backText: {
     color: "#0a7ea4",
     fontSize: 15,
     fontWeight: "600",
   },
-  titulo: {
+  galeria: {
+    height: 160,
+    marginBottom: 16,
+  },
+  imagen: {
+    width: 250,
+    height: 150,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  headerInfo: {
+    marginBottom: 8,
+  },
+  nombre: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#111",
   },
-  subTituloInfo: {
+  subtituloHeader: {
     fontSize: 14,
-    color: "#555",
-    marginTop: 2,
-  },
-  estrellasDetalle: {
-    fontSize: 13,
-    color: "#444",
-    marginTop: 4,
-    marginBottom: 15,
-  },
-  seccionVideo: {
-    marginBottom: 16,
-  },
-  tituloVideo: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 6,
-  },
-  avisoWeb: {
-    fontSize: 13,
     color: "#666",
-    fontStyle: "italic",
-    backgroundColor: "#f4f4f4",
-    padding: 10,
-    borderRadius: 6,
+    marginTop: 2,
+    marginBottom: 10,
+  },
+  estadoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 8,
+  },
+  badgeEstado: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    fontWeight: "bold",
+    fontSize: 12,
+  },
+  abierto: {
+    backgroundColor: "#e8f5e9",
+    color: "#2e7d32",
+  },
+  cerrado: {
+    backgroundColor: "#ffebee",
+    color: "#c62828",
+  },
+  estrellas: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#444",
+  },
+  seccion: {
+    marginTop: 16,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#eee",
+  },
+  seccionTitulo: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginBottom: 8,
+    color: "#333",
+  },
+  descripcionText: {
+    fontSize: 14,
+    color: "#444",
+    lineHeight: 20,
   },
   video: {
     width: "100%",
@@ -257,68 +397,56 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#000",
   },
-  botonesContacto: {
+  botonesAccion: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 20,
   },
-  botonAccion: {
-    flexBasis: "48%",
-    flexGrow: 1,
-    backgroundColor: "#0a7ea4",
-    padding: 12,
+  btnAccion: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     borderRadius: 8,
-    alignItems: "center",
   },
-  botonWhatsapp: {
-    backgroundColor: "#25D366",
-  },
-  botonRedes: {
-    backgroundColor: "#E1306C",
-  },
-  botonIr: {
-    backgroundColor: "#555",
-  },
-  textoBoton: {
+  btnAccionTexto: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 14,
+    fontSize: 13,
   },
-  contenedorFotos: {
+  filaHorario: {
     flexDirection: "row",
-    marginTop: 8,
+    alignItems: "center",
+    paddingVertical: 4,
   },
-  miniaturaFoto: {
-    width: 120,
-    height: 90,
-    borderRadius: 6,
-    marginRight: 8,
-    backgroundColor: "#eee",
-  },
-  seccion: {
-    marginBottom: 14,
-    backgroundColor: "#f9f9f9",
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  subtituloSeccion: {
-    fontSize: 14,
+  diaTexto: {
     fontWeight: "bold",
-    color: "#222",
-    marginBottom: 4,
+    color: "#444",
+    width: 90,
   },
-  texto: {
-    fontSize: 14,
+  turnosTexto: {
     color: "#555",
+    flex: 1,
   },
-  errorText: {
-    fontSize: 16,
-    color: "#c62828",
-    textAlign: "center",
-    marginTop: 40,
-    marginBottom: 20,
+  horarioVacio: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  chipsContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chipPago: {
+    backgroundColor: "#f0fdf4",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+  },
+  chipPagoTexto: {
+    fontSize: 12,
+    color: "#166534",
+    fontWeight: "bold",
   },
 });
