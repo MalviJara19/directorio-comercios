@@ -92,3 +92,85 @@ export async function actualizarAvisosActivos(avisosActivos: boolean) {
 
   return respuesta.data.datos;
 }
+
+// ================================
+// RESEÑAS
+// ================================
+
+// Obtener las reseñas de un comercio.
+// Devuelve datos y metadatos de paginación.
+export async function obtenerResenasPorComercio(
+  comercioId: string,
+  pagina = 1,
+  porPagina = 20,
+) {
+  const respuesta = await api.get(
+    `/comercios/${comercioId}/resenas`,
+    {
+      params: { pagina, porPagina },
+    },
+  );
+
+  return respuesta.data;
+}
+
+// Crear una reseña.
+export async function crearResena(
+  comercioId: string,
+  datos: {
+    estrellas: 1 | 2 | 3 | 4 | 5;
+    comentario: string;
+  },
+) {
+  const respuesta = await api.post(
+    `/comercios/${comercioId}/resenas`,
+    datos,
+  );
+
+  return respuesta.data.datos;
+}
+
+// Editar una reseña propia.
+export async function editarResena(
+  resenaId: string,
+  datos: {
+    estrellas?: 1 | 2 | 3 | 4 | 5;
+    comentario?: string;
+  },
+) {
+  const respuesta = await api.patch(
+    `/resenas/${resenaId}`,
+    datos,
+  );
+
+  return respuesta.data.datos;
+}
+
+// Eliminar una reseña propia.
+export async function eliminarResena(resenaId: string) {
+  await api.delete(`/resenas/${resenaId}`);
+}
+
+// Reportar una reseña.
+export async function reportarResena(resenaId: string) {
+  const respuesta = await api.post(
+    `/resenas/${resenaId}/reportes`,
+  );
+
+  return respuesta.data.datos;
+}
+
+// Responder una reseña como comercio.
+export async function responderResena(
+  resenaId: string,
+  respuestaTexto: string,
+) {
+  const respuesta = await api.post(
+    `/resenas/${resenaId}/respuesta`,
+    {
+      respuesta: respuestaTexto,
+    },
+  );
+
+  return respuesta.data.datos;
+}
