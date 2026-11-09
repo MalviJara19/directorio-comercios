@@ -1,3 +1,4 @@
+
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
@@ -11,34 +12,79 @@ import {
   View,
 } from "react-native";
 
-import { obtenerComercioPorId } from "@/servicios/serviciosComercios";
-import { Comercio } from "@/tipos/comercios";
+import { api } from "@/servicios/api";
+
+type ComercioDetalle = {
+  id: string;
+  nombre: string;
+  rubroId: string;
+  descripcion: string;
+  direccion: string;
+  coordenadas: {
+    latitud: number;
+    longitud: number;
+  };
+  telefono: string | null;
+  whatsapp: string | null;
+  instagram: string | null;
+  imagenes: string[];
+  videoUrl: string | null;
+  horarios: {
+    dia: number;
+    abre: string;
+    cierra: string;
+  }[];
+  mediosDePago: string[];
+  puntaje: number;
+  cantidadResenas: number;
+};
+
+const NOMBRES_RUBROS: Record<string, string> = {
+  "rub-gastronomia": "Gastronomía",
+  "rub-indumentaria": "Indumentaria",
+  "rub-hogar": "Hogar",
+  "rub-ferreteria": "Ferretería y construcción",
+  "rub-salud": "Salud y farmacia",
+  "rub-servicios": "Servicios",
+  "rub-tecnologia": "Tecnología",
+  "rub-libreria": "Librería",
+  "rub-otros": "Otros",
+};
 
 export default function DetalleComercioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
 
-  const [comercio, setComercio] = useState<Comercio | null>(null);
-  const [cargando, setCargando] = useState<boolean>(true);
+  const [comercio, setComercio] = useState<ComercioDetalle | null>(null);
+  const [cargando, setCargando] = useState(true);
 
-  // Configuración del reproductor de video (Expo Video)
-  const videoSource = comercio?.videoPresentacion || "";
+  const videoSource = comercio?.videoUrl || "";
+
   const player = useVideoPlayer(videoSource, (playerInstance) => {
     playerInstance.loop = true;
   });
 
   useEffect(() => {
     async function cargarDetalle() {
-      if (!id) return;
+      if (!id) {
+        setCargando(false);
+        return;
+      }
+
       try {
-        const datos = await obtenerComercioPorId(id);
-        setComercio(datos);
+        setCargando(true);
+
+        const respuesta = await api.get(`/comercios/${id}`);
+
+        setComercio(respuesta.data.datos);
       } catch (error) {
         console.error("Error al cargar el detalle del comercio:", error);
+        setComercio(null);
       } finally {
         setCargando(false);
       }
     }
+
     cargarDetalle();
   }, [id]);
 
@@ -46,7 +92,9 @@ export default function DetalleComercioScreen() {
     return (
       <View style={styles.centrado}>
         <ActivityIndicator size="large" color="#0a7ea4" />
-        <Text style={{ marginTop: 8 }}>Cargando ficha del comercio...</Text>
+        <Text style={{ marginTop: 8 }}>
+          Cargando ficha del comercio...
+        </Text>
       </View>
     );
   }
@@ -54,7 +102,10 @@ export default function DetalleComercioScreen() {
   if (!comercio) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>No se encontró el comercio.</Text>
+        <Text style={styles.errorText}>
+          No se encontró el comercio.
+        </Text>
+
         <TouchableOpacity
           onPress={() => router.back()}
           style={styles.botonVolver}
@@ -65,9 +116,17 @@ export default function DetalleComercioScreen() {
     );
   }
 
+  const nombreRubro =
+    NOMBRES_RUBROS[comercio.rubroId] || comercio.rubroId;
+
+  const latitud = comercio.coordenadas?.latitud ?? 0;
+  const longitud = comercio.coordenadas?.longitud ?? 0;
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Botón Volver */}
+    <ScrollView
+      style={styles.container}
+      showsVerticalScrollIndicator={false}
+    >
       <TouchableOpacity
         onPress={() => router.back()}
         style={styles.botonVolver}
@@ -75,19 +134,22 @@ export default function DetalleComercioScreen() {
         <Text style={styles.textoVolver}>← Volver al listado</Text>
       </TouchableOpacity>
 
-      {/* Encabezado Ficha */}
       <Text style={styles.titulo}>{comercio.nombre}</Text>
+
       <Text style={styles.subTituloInfo}>
-        {comercio.rubro.toUpperCase()} • {comercio.direccion}
-      </Text>
-      <Text style={styles.estrellasDetalle}>
-        ⭐ {comercio.promedioEstrellas} ({comercio.totalResenas} reseñas)
+        {nombreRubro} • {comercio.direccion}
       </Text>
 
-      {/* Video de presentación (Expo Video - Requisito técnico) */}
-      {comercio.videoPresentacion ? (
+      <Text style={styles.estrellasDetalle}>
+        ⭐ {comercio.puntaje} ({comercio.cantidadResenas} reseñas)
+      </Text>
+
+      {comercio.videoUrl ? (
         <View style={styles.seccionVideo}>
-          <Text style={styles.tituloVideo}>🎥 Video de Presentación (30s)</Text>
+          <Text style={styles.tituloVideo}>
+            🎥 Video de Presentación
+          </Text>
+
           <VideoView
             player={player}
             style={styles.video}
@@ -96,37 +158,40 @@ export default function DetalleComercioScreen() {
         </View>
       ) : null}
 
-      {/* Botones de acción rápida: Llamar, WhatsApp, Ir (Mapa) */}
       <View style={styles.botonesContacto}>
-        {comercio.telefono && (
+        {comercio.telefono ? (
           <TouchableOpacity
             style={styles.botonAccion}
-            onPress={() => Linking.openURL(`tel:${comercio.telefono}`)}
+            onPress={() =>
+              Linking.openURL(`tel:${comercio.telefono}`)
+            }
           >
             <Text style={styles.textoBoton}>📞 Llamar</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
 
-        {comercio.whatsapp && (
+        {comercio.whatsapp ? (
           <TouchableOpacity
             style={[styles.botonAccion, styles.botonWhatsapp]}
             onPress={() => {
-              const numeroLimpio = comercio.whatsapp?.replace(/\D/g, "") || "";
-              const urlWhatsapp = `https://api.whatsapp.com/send?phone=${numeroLimpio}`;
+              const numeroLimpio =
+                comercio.whatsapp?.replace(/\D/g, "") || "";
 
-              Linking.openURL(urlWhatsapp).catch((err) =>
-                console.error("Error al abrir WhatsApp:", err)
+              Linking.openURL(
+                `https://api.whatsapp.com/send?phone=${numeroLimpio}`
+              ).catch((error) =>
+                console.error("Error al abrir WhatsApp:", error)
               );
             }}
           >
             <Text style={styles.textoBoton}>💬 WhatsApp</Text>
           </TouchableOpacity>
-        )}
+        ) : null}
 
         <TouchableOpacity
           style={[styles.botonAccion, styles.botonIr]}
           onPress={() => {
-            const url = `https://www.google.com/maps/search/?api=1&query=${comercio.latitud},${comercio.longitud}`;
+            const url = `https://www.google.com/maps/search/?api=1&query=${latitud},${longitud}`;
             Linking.openURL(url);
           }}
         >
@@ -134,16 +199,46 @@ export default function DetalleComercioScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Información general */}
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>📄 Descripción</Text>
-        <Text style={styles.texto}>{comercio.descripcion}</Text>
+        <Text style={styles.subtituloSeccion}>
+          📄 Descripción
+        </Text>
+
+        <Text style={styles.texto}>
+          {comercio.descripcion || "Sin descripción disponible."}
+        </Text>
       </View>
 
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>💳 Medios de pago aceptados</Text>
-        <Text style={styles.texto}>{comercio.mediosDePago.join(", ")}</Text>
+        <Text style={styles.subtituloSeccion}>
+          💳 Medios de pago aceptados
+        </Text>
+
+        <Text style={styles.texto}>
+          {comercio.mediosDePago?.length
+            ? comercio.mediosDePago.join(", ")
+            : "No se informaron medios de pago."}
+        </Text>
       </View>
+
+      {comercio.instagram ? (
+        <View style={styles.seccion}>
+          <Text style={styles.subtituloSeccion}>
+            📷 Instagram
+          </Text>
+
+          <TouchableOpacity
+            onPress={() => {
+              const usuario = comercio.instagram?.replace(/^@/, "");
+              Linking.openURL(`https://www.instagram.com/${usuario}`);
+            }}
+          >
+            <Text style={styles.textoInstagram}>
+              @{comercio.instagram.replace(/^@/, "")}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -240,6 +335,10 @@ const styles = StyleSheet.create({
   texto: {
     fontSize: 14,
     color: "#555",
+  },
+  textoInstagram: {
+    fontSize: 14,
+    color: "#0a7ea4",
   },
   errorText: {
     fontSize: 16,
