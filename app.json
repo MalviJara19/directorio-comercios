@@ -26,6 +26,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Necesitamos acceder a tus fotos para que puedas agregarlas a tu comercio.",
+          "cameraPermission": "Necesitamos acceder a la cámara para que puedas tomar fotos y grabar videos.",
+          "microphonePermission": "Necesitamos acceder al micrófono para grabar videos con sonido."
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "backgroundColor": "#208AEF",
@@ -33,6 +41,12 @@
           "imageWidth": 76
         }
       ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "La aplicación necesita acceder a la cámara para escanear códigos QR."
+        }
+      ],  
       "expo-image",
       "expo-web-browser",
       "expo-video",

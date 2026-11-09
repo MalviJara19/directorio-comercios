@@ -54,6 +54,11 @@ export default function RootLayout() {
         />
 
         <Stack.Screen
+           name="perfiles/fotos-videos"
+           options={{ headerShown: false }}
+        />
+
+        <Stack.Screen
           name="auth/registro"
           options={{ title: 'Crear cuenta' }}
         />
