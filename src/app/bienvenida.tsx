@@ -1,10 +1,7 @@
+import { cerrarSesion } from "@/servicios/sesion";
 import { useRouter } from "expo-router";
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Bienvenida() {
   const router = useRouter();
@@ -17,40 +14,34 @@ export default function Bienvenida() {
     router.push("/auth/registro");
   };
 
-  const handleContinuar = () => {
+  const handleContinuar = async () => {
+    await cerrarSesion();
     router.replace("/");
   };
 
   return (
     <View style={styles.contenedor}>
       <View style={styles.contenido}>
-        <Text style={styles.icono}>🏪</Text>
+        <Ionicons name="storefront" size={85} color="#2a3449" />
 
-        <Text style={styles.titulo}>
-          Directorio de Comercios
-        </Text>
+        <Text style={styles.titulo}>Directorio de Comercios</Text>
 
         <Text style={styles.descripcion}>
-          Descubrí comercios, promociones y servicios
-          cerca tuyo.
+          Descubrí comercios, promociones y servicios cerca tuyo.
         </Text>
 
         <TouchableOpacity
           style={styles.botonPrincipal}
           onPress={handleIniciarSesion}
         >
-          <Text style={styles.textoBotonPrincipal}>
-            Iniciar sesión
-          </Text>
+          <Text style={styles.textoBotonPrincipal}>Iniciar sesión</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.botonSecundario}
           onPress={handleRegistrarse}
         >
-          <Text style={styles.textoBotonSecundario}>
-            Registrarme
-          </Text>
+          <Text style={styles.textoBotonSecundario}>Registrarme</Text>
         </TouchableOpacity>
 
         <TouchableOpacity

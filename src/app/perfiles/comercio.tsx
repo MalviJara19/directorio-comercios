@@ -110,6 +110,8 @@ export default function PerfilComercio() {
                 router.push("/perfiles/estadisticas");
               } else if (opcion.titulo === "Validar promociones") {
                 router.push("/perfiles/validar-promociones");
+              } else if (opcion.titulo === "Reseñas") {
+                router.push("/perfiles/resenas-comercio");
               } else {
                 mostrarProximamente(opcion.titulo);
               }
@@ -149,7 +151,7 @@ const styles = StyleSheet.create({
   },
   contenidoInterno: {
     padding: 20,
-    paddingBottom: 30,
+    paddingBottom: 120,
   },
   iconoPrincipal: {
     fontSize: 42,

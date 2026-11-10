@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,6 +10,8 @@ import {
 
 import { validarUsoPromocion } from "@/servicios/api";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as Haptics from "expo-haptics";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
 
 export default function ValidarPromociones() {
@@ -18,6 +20,52 @@ export default function ValidarPromociones() {
   const [permiso, solicitarPermiso] = useCameraPermissions();
   const [codigoEscaneado, setCodigoEscaneado] = useState<string | null>(null);
   const [procesando, setProcesando] = useState(false);
+  const [autenticado, setAutenticado] = useState(false);
+  const [verificandoHuella, setVerificandoHuella] = useState(true);
+
+  useEffect(() => {
+    async function verificarIdentidad() {
+      try {
+        const tieneHardware = await LocalAuthentication.hasHardwareAsync();
+
+        const tieneHuellaRegistrada =
+          await LocalAuthentication.isEnrolledAsync();
+
+        if (!tieneHardware || !tieneHuellaRegistrada) {
+          Alert.alert(
+            "Autenticación no disponible",
+            "Este dispositivo no tiene autenticación biométrica configurada.",
+            [{ text: "Volver", onPress: () => router.back() }],
+          );
+          return;
+        }
+
+        const resultado = await LocalAuthentication.authenticateAsync({
+          promptMessage: "Autenticá tu identidad para validar promociones",
+          cancelLabel: "Cancelar",
+        });
+
+        if (resultado.success) {
+          setAutenticado(true);
+        } else {
+          Alert.alert(
+            "Acceso no autorizado",
+            "Necesitás autenticarte para utilizar el lector QR.",
+            [{ text: "Volver", onPress: () => router.back() }],
+          );
+        }
+      } catch (error) {
+        console.error("Error en autenticación biométrica:", error);
+        Alert.alert("Error", "No se pudo verificar tu identidad.", [
+          { text: "Volver", onPress: () => router.back() },
+        ]);
+      } finally {
+        setVerificandoHuella(false);
+      }
+    }
+
+    verificarIdentidad();
+  }, []);
 
   async function procesarCodigo(codigo: string) {
     if (procesando) return;
@@ -27,6 +75,7 @@ export default function ValidarPromociones() {
       setCodigoEscaneado(codigo);
 
       const resultado = await validarUsoPromocion(codigo);
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       Alert.alert(
         "¡Promoción validada!",
@@ -35,6 +84,7 @@ export default function ValidarPromociones() {
 
       console.log("Resultado de la validación:", resultado);
     } catch (error: any) {
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       console.error("Error al validar el QR:", error);
 
       Alert.alert(
@@ -45,6 +95,19 @@ export default function ValidarPromociones() {
     } finally {
       setProcesando(false);
     }
+  }
+
+  if (verificandoHuella) {
+    return (
+      <View style={estilos.cargando}>
+        <ActivityIndicator size="large" />
+        <Text>Verificando identidad...</Text>
+      </View>
+    );
+  }
+
+  if (!autenticado) {
+    return null;
   }
 
   if (!permiso) {
@@ -101,22 +164,22 @@ export default function ValidarPromociones() {
       />
 
       {codigoEscaneado && (
-  <View style={estilos.resultado}>
-    <Text style={estilos.textoResultado}>Código detectado:</Text>
-    <Text>{codigoEscaneado}</Text>
+        <View style={estilos.resultado}>
+          <Text style={estilos.textoResultado}>Código detectado:</Text>
+          <Text>{codigoEscaneado}</Text>
 
-    {procesando ? (
-      <ActivityIndicator size="small" style={{ marginTop: 15 }} />
-    ) : (
-      <TouchableOpacity
-        style={estilos.boton}
-        onPress={() => setCodigoEscaneado(null)}
-      >
-        <Text style={estilos.textoBoton}>Escanear otro código</Text>
-      </TouchableOpacity>
-    )}
-  </View>
-)}
+          {procesando ? (
+            <ActivityIndicator size="small" style={{ marginTop: 15 }} />
+          ) : (
+            <TouchableOpacity
+              style={estilos.boton}
+              onPress={() => setCodigoEscaneado(null)}
+            >
+              <Text style={estilos.textoBoton}>Escanear otro código</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
     </View>
   );
 }

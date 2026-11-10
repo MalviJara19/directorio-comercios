@@ -1,4 +1,3 @@
-
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -14,7 +13,7 @@ import {
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
-import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { Comercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -24,7 +23,7 @@ import {
   quitarFavorito,
 } from "../servicios/api";
 
-const RUBROS_POR_ID: Record<string, RubroComercio> = {
+const RUBROS_POR_ID: Record<string, string> = {
   "rub-gastronomia": "gastronomia",
   "rub-indumentaria": "indumentaria",
   "rub-hogar": "hogar",
@@ -38,7 +37,7 @@ const RUBROS_POR_ID: Record<string, RubroComercio> = {
 
 const LISTA_RUBROS: {
   label: string;
-  value: RubroComercio | "todos";
+  value: string;
 }[] = [
   { label: "Todos", value: "todos" },
   { label: "Gastronomía", value: "gastronomia" },
@@ -58,9 +57,9 @@ export default function HomeScreen() {
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [busqueda, setBusqueda] = useState<string>("");
-  const [rubroSeleccionado, setRubroSeleccionado] = useState<
-    RubroComercio | "todos"
-  >("todos");
+  const [rubroSeleccionado, setRubroSeleccionado] = useState<string | "todos">(
+    "todos",
+  );
   const [soloAbiertos, setSoloAbiertos] = useState<boolean>(false);
 
   const [favoritos, setFavoritos] = useState<string[]>([]);
@@ -90,6 +89,7 @@ export default function HomeScreen() {
         pagina++;
 
         if (datos.length === 0) {
+          console.log("Respuesta completa de un comercio:", datos[0]);
           break;
         }
       } while (todosLosComercios.length < total);
@@ -99,34 +99,30 @@ export default function HomeScreen() {
         .map((c) => ({
           id: c.id,
           nombre: c.nombre,
-          rubro: RUBROS_POR_ID[c.rubroId] || "otros",
+          rubroId: c.rubroId,
           descripcion: c.descripcion || "",
           direccion: c.direccion || "",
 
-          latitud: Number(c.coordenadas?.latitud ?? c.latitud ?? 0),
-          longitud: Number(c.coordenadas?.longitud ?? c.longitud ?? 0),
+          coordenadas: {
+            latitud: Number(c.coordenadas?.latitud ?? 0),
+            longitud: Number(c.coordenadas?.longitud ?? 0),
+          },
 
           telefono: c.telefono || null,
           whatsapp: c.whatsapp || null,
-          redesSociales: c.redesSociales || c.instagram || null,
+          instagram: c.instagram || null,
 
+          imagenes: c.imagenes || [],
+          videoUrl: c.videoUrl || null,
+
+          horarios: c.horarios || [],
           mediosDePago: c.mediosDePago || [],
-          fotos: c.fotos || [],
-          videoPresentacion: c.videoPresentacion || null,
 
-          horarios: c.horarios || {
-            aperturaManana: null,
-            cierreManana: null,
-            aperturaTarde: null,
-            cierreTarde: null,
-            atiendeSabados: false,
-            cierreSabado: null,
-          },
+          puntaje: Number(c.puntaje ?? 0),
+          cantidadResenas: Number(c.cantidadResenas ?? 0),
 
-          estaAbiertoPorVacaciones: c.estaAbiertoPorVacaciones || false,
-
-          promedioEstrellas: Number(c.puntaje ?? 0),
-          totalResenas: Number(c.cantidadResenas ?? 0),
+          codigoQr: c.codigoQr || null,
+          activo: c.activo,
         }));
 
       setComercios(comerciosAdaptados);
@@ -145,9 +141,7 @@ export default function HomeScreen() {
       const perfil = await obtenerMiPerfil();
 
       const listaFavoritos =
-        perfil?.favoritos ??
-        perfil?.comerciosFavoritos ??
-        [];
+        perfil?.favoritos ?? perfil?.comerciosFavoritos ?? [];
 
       const idsFavoritos = listaFavoritos
         .map((favorito: any) => {
@@ -155,11 +149,7 @@ export default function HomeScreen() {
             return favorito;
           }
 
-          return (
-            favorito.comercioId ??
-            favorito.comercio?.id ??
-            favorito.id
-          );
+          return favorito.comercioId ?? favorito.comercio?.id ?? favorito.id;
         })
         .filter((id: any) => id);
 
@@ -184,9 +174,7 @@ export default function HomeScreen() {
       if (yaEsFavorito) {
         await quitarFavorito(comercioId);
 
-        setFavoritos((actuales) =>
-          actuales.filter((id) => id !== comercioId)
-        );
+        setFavoritos((actuales) => actuales.filter((id) => id !== comercioId));
       } else {
         await agregarFavorito(comercioId);
 
@@ -197,12 +185,10 @@ export default function HomeScreen() {
 
       Alert.alert(
         "Error",
-        "No se pudo actualizar el favorito. Verificá tu sesión e intentá nuevamente."
+        "No se pudo actualizar el favorito. Verificá tu sesión e intentá nuevamente.",
       );
     } finally {
-      setActualizando((actuales) =>
-        actuales.filter((id) => id !== comercioId)
-      );
+      setActualizando((actuales) => actuales.filter((id) => id !== comercioId));
     }
   }
 
@@ -216,16 +202,16 @@ export default function HomeScreen() {
     const busquedaLimpia = quitarAcentos(busqueda);
 
     const coincideNombre = quitarAcentos(comercio.nombre).includes(
-      busquedaLimpia
+      busquedaLimpia,
     );
 
-    const coincideRubro = quitarAcentos(comercio.rubro).includes(
-      busquedaLimpia
-    );
+    const rubro = RUBROS_POR_ID[comercio.rubroId] || "otros";
 
-    const coincideDireccion = quitarAcentos(
-      comercio.direccion
-    ).includes(busquedaLimpia);
+    const coincideRubro = quitarAcentos(rubro).includes(busquedaLimpia);
+
+    const coincideDireccion = quitarAcentos(comercio.direccion).includes(
+      busquedaLimpia,
+    );
 
     const coincideDescripcion = comercio.descripcion
       ? quitarAcentos(comercio.descripcion).includes(busquedaLimpia)
@@ -239,14 +225,16 @@ export default function HomeScreen() {
 
     if (!coincideTexto) return false;
 
-    if (
-      rubroSeleccionado !== "todos" &&
-      comercio.rubro !== rubroSeleccionado
-    ) {
+    if (rubroSeleccionado !== "todos" && rubro !== rubroSeleccionado) {
       return false;
     }
 
-    if (soloAbiertos && !estaAbiertoAhora(comercio.horarios)) {
+    const cerradoPorVacaciones = comercio.horarios.length === 0;
+
+    if (
+      soloAbiertos &&
+      (cerradoPorVacaciones || !estaAbiertoAhora(comercio.horarios))
+    ) {
       return false;
     }
 
@@ -280,17 +268,11 @@ export default function HomeScreen() {
           return (
             <TouchableOpacity
               key={r.value}
-              style={[
-                styles.chipRubro,
-                activo && styles.chipRubroActivo,
-              ]}
+              style={[styles.chipRubro, activo && styles.chipRubroActivo]}
               onPress={() => setRubroSeleccionado(r.value)}
             >
               <Text
-                style={[
-                  styles.textoChip,
-                  activo && styles.textoChipActivo,
-                ]}
+                style={[styles.textoChip, activo && styles.textoChipActivo]}
               >
                 {r.label}
               </Text>
@@ -300,10 +282,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        style={[
-          styles.botonAbierto,
-          soloAbiertos && styles.botonAbiertoActivo,
-        ]}
+        style={[styles.botonAbierto, soloAbiertos && styles.botonAbiertoActivo]}
         onPress={() => setSoloAbiertos(!soloAbiertos)}
       >
         <Text
@@ -312,18 +291,14 @@ export default function HomeScreen() {
             soloAbiertos && styles.textoBotonActivo,
           ]}
         >
-          {soloAbiertos
-            ? "✓ Abierto ahora (Filtrando)"
-            : "⏱️ Abierto ahora"}
+          {soloAbiertos ? "✓ Abierto ahora (Filtrando)" : "⏱️ Abierto ahora"}
         </Text>
       </TouchableOpacity>
 
       {cargando ? (
         <View style={styles.cargandoContainer}>
           <ActivityIndicator size="large" color="#0a7ea4" />
-          <Text style={styles.textoCargando}>
-            Cargando comercios...
-          </Text>
+          <Text style={styles.textoCargando}>Cargando comercios...</Text>
         </View>
       ) : (
         <FlatList
@@ -334,15 +309,17 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={styles.vacio}>
-              {soloAbiertos &&
-              !busqueda &&
-              rubroSeleccionado === "todos"
+              {soloAbiertos && !busqueda && rubroSeleccionado === "todos"
                 ? "En este momento todos los comercios están cerrados."
                 : "No se encontraron comercios que coincidan con la búsqueda."}
             </Text>
           }
           renderItem={({ item }) => {
-            const abierto = estaAbiertoAhora(item.horarios);
+            const cerradoPorVacaciones = item.horarios.length === 0;
+
+            const abierto =
+              !cerradoPorVacaciones && estaAbiertoAhora(item.horarios);
+
             const esFavorito = favoritos.includes(item.id);
             const estaActualizando = actualizando.includes(item.id);
 
@@ -358,21 +335,18 @@ export default function HomeScreen() {
                     })
                   }
                 >
-                  <Text style={styles.comercio}>
-                    {item.nombre}
-                  </Text>
+                  <Text style={styles.comercio}>{item.nombre}</Text>
 
                   <Text style={styles.rubroTexto}>
-                    {item.rubro.toUpperCase()}{" "}
+                    {(RUBROS_POR_ID[item.rubroId] || "otros").toUpperCase()}{" "}
                     {abierto ? "• Abierto" : "• Cerrado"}
                   </Text>
 
                   <Text style={styles.estrellas}>
-                    ⭐ {item.promedioEstrellas} estrellas (
-                    {item.totalResenas})
+                    ⭐ {item.puntaje} estrellas ({item.cantidadResenas})
                   </Text>
 
-                  {item.estaAbiertoPorVacaciones && (
+                  {cerradoPorVacaciones && (
                     <View style={styles.vacacionesBadge}>
                       <Text style={styles.vacacionesText}>
                         🏖️ Cerrado por vacaciones

@@ -2,7 +2,7 @@ import axios from "axios";
 import { obtenerToken } from "./sesion";
 
 export const api = axios.create({
-  baseURL: "http://192.168.1.68:3000",
+  baseURL: "http://192.168.1.240:3000",
   headers: {
     "Content-Type": "application/json",
   },
@@ -160,6 +160,41 @@ export async function actualizarAvisosActivos(avisosActivos: boolean) {
   const respuesta = await api.patch("/yo", {
     avisosActivos,
   });
+
+  return respuesta.data.datos;
+}
+
+// ================================
+// RESEÑAS DEL COMERCIO
+// ================================
+
+// Obtener reseñas recibidas por el comercio.
+export async function obtenerResenasPorComercio(
+  comercioId: string,
+  pagina = 1,
+  porPagina = 20,
+) {
+  const respuesta = await api.get(
+    `/comercios/${comercioId}/resenas`,
+    {
+      params: { pagina, porPagina },
+    },
+  );
+
+  return respuesta.data;
+}
+
+// Responder una reseña como comercio.
+export async function responderResena(
+  resenaId: string,
+  respuestaTexto: string,
+) {
+  const respuesta = await api.post(
+    `/resenas/${resenaId}/respuesta`,
+    {
+      respuesta: respuestaTexto,
+    },
+  );
 
   return respuesta.data.datos;
 }
