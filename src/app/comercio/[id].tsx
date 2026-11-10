@@ -1,9 +1,9 @@
-
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Image,
   Linking,
   ScrollView,
   StyleSheet,
@@ -76,6 +76,16 @@ export default function DetalleComercioScreen() {
 
         const respuesta = await api.get(`/comercios/${id}`);
 
+        console.log(
+          "DETALLE COMPLETO DEL COMERCIO:",
+          JSON.stringify(respuesta.data.datos, null, 2),
+        );
+
+        console.log(
+          "IMÁGENES DEL COMERCIO:",
+          JSON.stringify(respuesta.data.datos?.imagenes, null, 2),
+        );
+
         setComercio(respuesta.data.datos);
       } catch (error) {
         console.error("Error al cargar el detalle del comercio:", error);
@@ -92,9 +102,7 @@ export default function DetalleComercioScreen() {
     return (
       <View style={styles.centrado}>
         <ActivityIndicator size="large" color="#0a7ea4" />
-        <Text style={{ marginTop: 8 }}>
-          Cargando ficha del comercio...
-        </Text>
+        <Text style={{ marginTop: 8 }}>Cargando ficha del comercio...</Text>
       </View>
     );
   }
@@ -102,9 +110,7 @@ export default function DetalleComercioScreen() {
   if (!comercio) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>
-          No se encontró el comercio.
-        </Text>
+        <Text style={styles.errorText}>No se encontró el comercio.</Text>
 
         <TouchableOpacity
           onPress={() => router.back()}
@@ -116,8 +122,7 @@ export default function DetalleComercioScreen() {
     );
   }
 
-  const nombreRubro =
-    NOMBRES_RUBROS[comercio.rubroId] || comercio.rubroId;
+  const nombreRubro = NOMBRES_RUBROS[comercio.rubroId] || comercio.rubroId;
 
   const latitud = comercio.coordenadas?.latitud ?? 0;
   const longitud = comercio.coordenadas?.longitud ?? 0;
@@ -125,6 +130,7 @@ export default function DetalleComercioScreen() {
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={{ paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
       <TouchableOpacity
@@ -144,11 +150,26 @@ export default function DetalleComercioScreen() {
         ⭐ {comercio.puntaje} ({comercio.cantidadResenas} reseñas)
       </Text>
 
+      {comercio.imagenes?.length > 0 && (
+        <View style={styles.seccion}>
+          <Text style={styles.subtituloSeccion}>📸 Fotos del comercio</Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {comercio.imagenes.map((imagen, indice) => (
+              <Image
+                key={indice}
+                source={{ uri: imagen }}
+                style={styles.imagenComercio}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {comercio.videoUrl ? (
         <View style={styles.seccionVideo}>
-          <Text style={styles.tituloVideo}>
-            🎥 Video de Presentación
-          </Text>
+          <Text style={styles.tituloVideo}>🎥 Video de Presentación</Text>
 
           <VideoView
             player={player}
@@ -162,9 +183,7 @@ export default function DetalleComercioScreen() {
         {comercio.telefono ? (
           <TouchableOpacity
             style={styles.botonAccion}
-            onPress={() =>
-              Linking.openURL(`tel:${comercio.telefono}`)
-            }
+            onPress={() => Linking.openURL(`tel:${comercio.telefono}`)}
           >
             <Text style={styles.textoBoton}>📞 Llamar</Text>
           </TouchableOpacity>
@@ -174,13 +193,12 @@ export default function DetalleComercioScreen() {
           <TouchableOpacity
             style={[styles.botonAccion, styles.botonWhatsapp]}
             onPress={() => {
-              const numeroLimpio =
-                comercio.whatsapp?.replace(/\D/g, "") || "";
+              const numeroLimpio = comercio.whatsapp?.replace(/\D/g, "") || "";
 
               Linking.openURL(
-                `https://api.whatsapp.com/send?phone=${numeroLimpio}`
+                `https://api.whatsapp.com/send?phone=${numeroLimpio}`,
               ).catch((error) =>
-                console.error("Error al abrir WhatsApp:", error)
+                console.error("Error al abrir WhatsApp:", error),
               );
             }}
           >
@@ -200,9 +218,7 @@ export default function DetalleComercioScreen() {
       </View>
 
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>
-          📄 Descripción
-        </Text>
+        <Text style={styles.subtituloSeccion}>📄 Descripción</Text>
 
         <Text style={styles.texto}>
           {comercio.descripcion || "Sin descripción disponible."}
@@ -210,9 +226,40 @@ export default function DetalleComercioScreen() {
       </View>
 
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>
-          💳 Medios de pago aceptados
-        </Text>
+        <Text style={styles.subtituloSeccion}>🕒 Horarios de atención</Text>
+
+        {comercio.horarios.length === 0 ? (
+          <Text style={styles.texto}>🏖️ Cerrado por vacaciones.</Text>
+        ) : (
+          [
+            "Domingo",
+            "Lunes",
+            "Martes",
+            "Miércoles",
+            "Jueves",
+            "Viernes",
+            "Sábado",
+          ].map((dia, indice) => {
+            const horariosDelDia = comercio.horarios.filter(
+              (h) => h.dia === indice,
+            );
+
+            return (
+              <Text key={dia} style={styles.texto}>
+                <Text style={{ fontWeight: "bold" }}>{dia}: </Text>
+                {horariosDelDia.length > 0
+                  ? horariosDelDia
+                      .map((h) => `${h.abre} a ${h.cierra}`)
+                      .join(" / ")
+                  : "Sin atención"}
+              </Text>
+            );
+          })
+        )}
+      </View>
+
+      <View style={styles.seccion}>
+        <Text style={styles.subtituloSeccion}>💳 Medios de pago aceptados</Text>
 
         <Text style={styles.texto}>
           {comercio.mediosDePago?.length
@@ -223,9 +270,7 @@ export default function DetalleComercioScreen() {
 
       {comercio.instagram ? (
         <View style={styles.seccion}>
-          <Text style={styles.subtituloSeccion}>
-            📷 Instagram
-          </Text>
+          <Text style={styles.subtituloSeccion}>📷 Instagram</Text>
 
           <TouchableOpacity
             onPress={() => {
@@ -346,5 +391,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 40,
     marginBottom: 20,
+  },
+
+  imagenComercio: {
+    width: 260,
+    height: 180,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: "#eeeeee",
   },
 });

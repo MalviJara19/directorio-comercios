@@ -27,6 +27,21 @@ export async function iniciarSesion(email: string, contrasena: string) {
   return respuesta.data;
 }
 
+
+export async function registrarUsuario(
+  nombre: string,
+  email: string,
+  contrasena: string,
+) {
+  const respuesta = await api.post("/auth/registro", {
+    nombre,
+    email,
+    contrasena,
+  });
+
+  return respuesta.data;
+}
+
 export async function obtenerMiComercio() {
   const respuesta = await api.get("/mi-comercio");
   return respuesta.data.datos;

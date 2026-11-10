@@ -82,6 +82,19 @@ export default function HomeScreen() {
       do {
         const respuesta = await obtenerComerciosAPI(pagina, porPagina);
         const datos = respuesta.datos || [];
+        if (pagina === 1) {
+          console.log(
+            "HORARIOS QUE ENVÍA LA API:",
+            datos.map((c: any) => ({
+              nombre: c.nombre,
+              horarios: c.horarios,
+            })),
+          );
+          console.log(
+            "DETALLE DE HORARIOS:",
+            JSON.stringify(datos[0]?.horarios, null, 2),
+          );
+        }
 
         todosLosComercios = [...todosLosComercios, ...datos];
         total = respuesta.meta?.total || todosLosComercios.length;
@@ -346,6 +359,8 @@ export default function HomeScreen() {
                     ⭐ {item.puntaje} estrellas ({item.cantidadResenas})
                   </Text>
 
+                  
+
                   {cerradoPorVacaciones && (
                     <View style={styles.vacacionesBadge}>
                       <Text style={styles.vacacionesText}>
@@ -415,16 +430,16 @@ const styles = StyleSheet.create({
   },
 
   rubrosContainer: {
-    height: 52,
-    maxHeight: 52,
-    marginBottom: 12,
-    flexGrow: 0,
-  },
+  minHeight: 60,
+  marginBottom: 12,
+  flexGrow: 0,
+},
 
   rubrosContenido: {
-    alignItems: "center",
-    paddingRight: 10,
-  },
+  alignItems: "center",
+  paddingRight: 10,
+  paddingVertical: 4,
+},
 
   chipRubro: {
     paddingHorizontal: 16,
@@ -435,6 +450,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
     justifyContent: "center",
+    minHeight: 44,
+    alignItems: "center",
   },
 
   chipRubroActivo: {

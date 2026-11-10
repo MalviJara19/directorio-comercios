@@ -1,4 +1,6 @@
+import { Link, useRouter } from "expo-router";
 import { useState } from "react";
+
 import {
   Alert,
   View,
@@ -8,67 +10,109 @@ import {
   KeyboardAvoidingView,
   StyleSheet,
 } from "react-native";
-import { Link } from "expo-router";
 
-
+import { registrarUsuario } from "../../servicios/api";
+import { guardarToken, guardarUsuario } from "../../servicios/sesion";
+import { registrarDispositivoParaNotificaciones } from "../../servicios/notificaciones";
 
 export default function RegistroScreen() {
+  const router = useRouter();
+  const [nombre, setNombre] = useState("");
   const [Email, setEmail] = useState("");
   const [Contraseña, setContraseña] = useState("");
   const [ConfirmarContraseña, setConfirmarContraseña] = useState("");
 
+  const handleRegistro = async () => {
   
-const handleRegistro = () => {
-  // 1. Comprobar que no haya campos vacíos
-  if (!Email.trim() || !Contraseña || !ConfirmarContraseña) {
-    Alert.alert(
-      "Campos incompletos",
-      "Por favor, completá todos los campos."
-    );
+  if (
+    !nombre.trim() ||
+    !Email.trim() ||
+    !Contraseña ||
+    !ConfirmarContraseña
+  ) {
+    Alert.alert("Campos incompletos", "Completá todos los campos.");
     return;
   }
 
-  // 2. Comprobar el formato del correo
+  
   const formatoEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
   if (!formatoEmail.test(Email.trim())) {
-    Alert.alert(
-      "Correo inválido",
-      "Ingresá una dirección de correo válida."
-    );
+    Alert.alert("Correo inválido", "Ingresá un correo válido.");
     return;
   }
 
-  // 3. Comprobar la longitud de la contraseña
+ 
   if (Contraseña.length < 8) {
     Alert.alert(
-      "Contraseña demasiado corta",
-      "La contraseña debe tener al menos 8 caracteres."
+      "Contraseña inválida",
+      "Debe tener al menos 8 caracteres.",
     );
     return;
   }
 
-  // 4. Comprobar que las contraseñas coincidan
+  
   if (Contraseña !== ConfirmarContraseña) {
-    Alert.alert(
-      "Contraseñas diferentes",
-      "Las contraseñas no coinciden."
-    );
+    Alert.alert("Error", "Las contraseñas no coinciden.");
     return;
   }
 
-  // 5. Por ahora, el registro es una prueba
-  Alert.alert(
-    "Validación correcta",
-    "Los datos son válidos. Cuando tengamos la API, podremos registrar la cuenta."
-  );
-};
+  try {
+   
+    const respuesta = await registrarUsuario(
+      nombre.trim(),
+      Email.trim(),
+      Contraseña,
+    );
 
+    await guardarToken(respuesta.datos.token);
+    await guardarUsuario(respuesta.datos.usuario);
+
+  
+    try {
+      await registrarDispositivoParaNotificaciones();
+    } catch (error) {
+      console.log("No se pudo registrar el dispositivo:", error);
+    }
+
+    Alert.alert(
+      "¡Registro exitoso!",
+      `Bienvenida/o ${respuesta.datos.usuario.nombre}`,
+      [
+        {
+          text: "Continuar",
+          onPress: () => router.replace("/"),
+        },
+      ],
+    );
+  } catch (error: any) {
+    console.log(
+      "Error al registrar usuario:",
+      error.response?.data || error.message,
+    );
+
+    const mensaje =
+      error.response?.data?.error?.mensaje ||
+      error.response?.data?.mensaje ||
+      "No se pudo registrar la cuenta. Intentá nuevamente.";
+
+    Alert.alert("Error al registrarse", mensaje);
+  }
+};
   return (
     <KeyboardAvoidingView behavior="padding" style={styles.container}>
       <View style={styles.card}>
         <Text style={styles.title}>Directorio de Comercios</Text>
         <Text style={styles.subtitle}> Registrate </Text>
+        <Text style={styles.label}>Nombre completo</Text>
+
+        <TextInput
+          style={styles.input}
+          placeholder="Ingresá tu nombre y apellido"
+          value={nombre}
+          onChangeText={setNombre}
+          autoCapitalize="words"
+        />
         <Text style={styles.label}>Correo electrónico</Text>
 
         <TextInput
@@ -102,17 +146,12 @@ const handleRegistro = () => {
           autoCapitalize="none"
         />
 
-        <TouchableOpacity
-          style={styles.button}
-          onPress={handleRegistro}
-        >
+        <TouchableOpacity style={styles.button} onPress={handleRegistro}>
           <Text style={styles.buttonText}>Registrarme</Text>
         </TouchableOpacity>
 
         <View style={styles.loginContainer}>
-          <Text style={styles.loginText}>
-            ¿Ya tenés una cuenta?
-          </Text>
+          <Text style={styles.loginText}>¿Ya tenés una cuenta?</Text>
 
           <Link href="/auth/login" style={styles.loginLink}>
             Iniciar sesión
@@ -201,4 +240,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 4,
   },
-}); 
+});
