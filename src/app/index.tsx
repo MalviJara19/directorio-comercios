@@ -14,7 +14,7 @@ import {
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
-import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { Comercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -23,8 +23,9 @@ import {
   obtenerMiPerfil,
   quitarFavorito,
 } from "../servicios/api";
+import { obtenerToken } from "../servicios/sesion";
 
-const RUBROS_POR_ID: Record<string, RubroComercio> = {
+const RUBROS_POR_ID: Record<string, string> = {
   "rub-gastronomia": "gastronomia",
   "rub-indumentaria": "indumentaria",
   "rub-hogar": "hogar",
@@ -38,7 +39,7 @@ const RUBROS_POR_ID: Record<string, RubroComercio> = {
 
 const LISTA_RUBROS: {
   label: string;
-  value: RubroComercio | "todos";
+  value: string;
 }[] = [
   { label: "Todos", value: "todos" },
   { label: "Gastronomía", value: "gastronomia" },
@@ -58,9 +59,9 @@ export default function HomeScreen() {
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [busqueda, setBusqueda] = useState<string>("");
-  const [rubroSeleccionado, setRubroSeleccionado] = useState<
-    RubroComercio | "todos"
-  >("todos");
+  const [rubroSeleccionado, setRubroSeleccionado] = useState<string | "todos">(
+    "todos",
+  );
   const [soloAbiertos, setSoloAbiertos] = useState<boolean>(false);
 
   const [favoritos, setFavoritos] = useState<string[]>([]);
@@ -84,6 +85,21 @@ export default function HomeScreen() {
         const respuesta = await obtenerComerciosAPI(pagina, porPagina);
         const datos = respuesta.datos || [];
 
+        if (pagina === 1) {
+          console.log(
+            "HORARIOS QUE ENVÍA LA API:",
+            datos.map((c: any) => ({
+              nombre: c.nombre,
+              horarios: c.horarios,
+            })),
+          );
+
+          console.log(
+            "DETALLE DE HORARIOS:",
+            JSON.stringify(datos[0]?.horarios, null, 2),
+          );
+        }
+
         todosLosComercios = [...todosLosComercios, ...datos];
         total = respuesta.meta?.total || todosLosComercios.length;
 
@@ -99,34 +115,30 @@ export default function HomeScreen() {
         .map((c) => ({
           id: c.id,
           nombre: c.nombre,
-          rubro: RUBROS_POR_ID[c.rubroId] || "otros",
+          rubroId: c.rubroId,
           descripcion: c.descripcion || "",
           direccion: c.direccion || "",
 
-          latitud: Number(c.coordenadas?.latitud ?? c.latitud ?? 0),
-          longitud: Number(c.coordenadas?.longitud ?? c.longitud ?? 0),
+          coordenadas: {
+            latitud: Number(c.coordenadas?.latitud ?? 0),
+            longitud: Number(c.coordenadas?.longitud ?? 0),
+          },
 
           telefono: c.telefono || null,
           whatsapp: c.whatsapp || null,
-          redesSociales: c.redesSociales || c.instagram || null,
+          instagram: c.instagram || null,
 
+          imagenes: c.imagenes || [],
+          videoUrl: c.videoUrl || null,
+
+          horarios: c.horarios || [],
           mediosDePago: c.mediosDePago || [],
-          fotos: c.fotos || [],
-          videoPresentacion: c.videoPresentacion || null,
 
-          horarios: c.horarios || {
-            aperturaManana: null,
-            cierreManana: null,
-            aperturaTarde: null,
-            cierreTarde: null,
-            atiendeSabados: false,
-            cierreSabado: null,
-          },
+          puntaje: Number(c.puntaje ?? 0),
+          cantidadResenas: Number(c.cantidadResenas ?? 0),
 
-          estaAbiertoPorVacaciones: c.estaAbiertoPorVacaciones || false,
-
-          promedioEstrellas: Number(c.puntaje ?? 0),
-          totalResenas: Number(c.cantidadResenas ?? 0),
+          codigoQr: c.codigoQr || null,
+          activo: c.activo,
         }));
 
       setComercios(comerciosAdaptados);
@@ -142,12 +154,18 @@ export default function HomeScreen() {
 
   async function cargarFavoritos() {
     try {
+      const token = await obtenerToken();
+
+      // Si no hay sesión, no se consulta el perfil.
+      if (!token) {
+        setFavoritos([]);
+        return;
+      }
+
       const perfil = await obtenerMiPerfil();
 
       const listaFavoritos =
-        perfil?.favoritos ??
-        perfil?.comerciosFavoritos ??
-        [];
+        perfil?.favoritos ?? perfil?.comerciosFavoritos ?? [];
 
       const idsFavoritos = listaFavoritos
         .map((favorito: any) => {
@@ -155,11 +173,7 @@ export default function HomeScreen() {
             return favorito;
           }
 
-          return (
-            favorito.comercioId ??
-            favorito.comercio?.id ??
-            favorito.id
-          );
+          return favorito.comercioId ?? favorito.comercio?.id ?? favorito.id;
         })
         .filter((id: any) => id);
 
@@ -176,6 +190,34 @@ export default function HomeScreen() {
       return;
     }
 
+    // Comprobar si el usuario inició sesión antes de llamar a la API.
+    try {
+      const token = await obtenerToken();
+
+      if (!token) {
+        Alert.alert(
+          "Iniciá sesión",
+          "Para guardar comercios en favoritos, primero tenés que iniciar sesión.",
+          [
+            { text: "Cancelar", style: "cancel" },
+            {
+              text: "Iniciar sesión",
+              onPress: () => router.push("/auth/login"),
+            },
+          ],
+        );
+
+        return;
+      }
+    } catch (error) {
+      console.error("Error al verificar la sesión:", error);
+      Alert.alert(
+        "Error",
+        "No se pudo verificar tu sesión. Intentá nuevamente.",
+      );
+      return;
+    }
+
     const yaEsFavorito = favoritos.includes(comercioId);
 
     try {
@@ -185,7 +227,7 @@ export default function HomeScreen() {
         await quitarFavorito(comercioId);
 
         setFavoritos((actuales) =>
-          actuales.filter((id) => id !== comercioId)
+          actuales.filter((id) => id !== comercioId),
         );
       } else {
         await agregarFavorito(comercioId);
@@ -197,11 +239,11 @@ export default function HomeScreen() {
 
       Alert.alert(
         "Error",
-        "No se pudo actualizar el favorito. Verificá tu sesión e intentá nuevamente."
+        "No se pudo actualizar el favorito. Intentá nuevamente.",
       );
     } finally {
       setActualizando((actuales) =>
-        actuales.filter((id) => id !== comercioId)
+        actuales.filter((id) => id !== comercioId),
       );
     }
   }
@@ -216,16 +258,16 @@ export default function HomeScreen() {
     const busquedaLimpia = quitarAcentos(busqueda);
 
     const coincideNombre = quitarAcentos(comercio.nombre).includes(
-      busquedaLimpia
+      busquedaLimpia,
     );
 
-    const coincideRubro = quitarAcentos(comercio.rubro).includes(
-      busquedaLimpia
-    );
+    const rubro = RUBROS_POR_ID[comercio.rubroId] || "otros";
 
-    const coincideDireccion = quitarAcentos(
-      comercio.direccion
-    ).includes(busquedaLimpia);
+    const coincideRubro = quitarAcentos(rubro).includes(busquedaLimpia);
+
+    const coincideDireccion = quitarAcentos(comercio.direccion).includes(
+      busquedaLimpia,
+    );
 
     const coincideDescripcion = comercio.descripcion
       ? quitarAcentos(comercio.descripcion).includes(busquedaLimpia)
@@ -239,14 +281,16 @@ export default function HomeScreen() {
 
     if (!coincideTexto) return false;
 
-    if (
-      rubroSeleccionado !== "todos" &&
-      comercio.rubro !== rubroSeleccionado
-    ) {
+    if (rubroSeleccionado !== "todos" && rubro !== rubroSeleccionado) {
       return false;
     }
 
-    if (soloAbiertos && !estaAbiertoAhora(comercio.horarios)) {
+    const cerradoPorVacaciones = comercio.horarios.length === 0;
+
+    if (
+      soloAbiertos &&
+      (cerradoPorVacaciones || !estaAbiertoAhora(comercio.horarios))
+    ) {
       return false;
     }
 
@@ -280,17 +324,11 @@ export default function HomeScreen() {
           return (
             <TouchableOpacity
               key={r.value}
-              style={[
-                styles.chipRubro,
-                activo && styles.chipRubroActivo,
-              ]}
+              style={[styles.chipRubro, activo && styles.chipRubroActivo]}
               onPress={() => setRubroSeleccionado(r.value)}
             >
               <Text
-                style={[
-                  styles.textoChip,
-                  activo && styles.textoChipActivo,
-                ]}
+                style={[styles.textoChip, activo && styles.textoChipActivo]}
               >
                 {r.label}
               </Text>
@@ -300,10 +338,7 @@ export default function HomeScreen() {
       </ScrollView>
 
       <TouchableOpacity
-        style={[
-          styles.botonAbierto,
-          soloAbiertos && styles.botonAbiertoActivo,
-        ]}
+        style={[styles.botonAbierto, soloAbiertos && styles.botonAbiertoActivo]}
         onPress={() => setSoloAbiertos(!soloAbiertos)}
       >
         <Text
@@ -312,18 +347,14 @@ export default function HomeScreen() {
             soloAbiertos && styles.textoBotonActivo,
           ]}
         >
-          {soloAbiertos
-            ? "✓ Abierto ahora (Filtrando)"
-            : "⏱️ Abierto ahora"}
+          {soloAbiertos ? "✓ Abierto ahora (Filtrando)" : "⏱️ Abierto ahora"}
         </Text>
       </TouchableOpacity>
 
       {cargando ? (
         <View style={styles.cargandoContainer}>
           <ActivityIndicator size="large" color="#0a7ea4" />
-          <Text style={styles.textoCargando}>
-            Cargando comercios...
-          </Text>
+          <Text style={styles.textoCargando}>Cargando comercios...</Text>
         </View>
       ) : (
         <FlatList
@@ -334,15 +365,17 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <Text style={styles.vacio}>
-              {soloAbiertos &&
-              !busqueda &&
-              rubroSeleccionado === "todos"
+              {soloAbiertos && !busqueda && rubroSeleccionado === "todos"
                 ? "En este momento todos los comercios están cerrados."
                 : "No se encontraron comercios que coincidan con la búsqueda."}
             </Text>
           }
           renderItem={({ item }) => {
-            const abierto = estaAbiertoAhora(item.horarios);
+            const cerradoPorVacaciones = item.horarios.length === 0;
+
+            const abierto =
+              !cerradoPorVacaciones && estaAbiertoAhora(item.horarios);
+
             const esFavorito = favoritos.includes(item.id);
             const estaActualizando = actualizando.includes(item.id);
 
@@ -358,21 +391,18 @@ export default function HomeScreen() {
                     })
                   }
                 >
-                  <Text style={styles.comercio}>
-                    {item.nombre}
-                  </Text>
+                  <Text style={styles.comercio}>{item.nombre}</Text>
 
                   <Text style={styles.rubroTexto}>
-                    {item.rubro.toUpperCase()}{" "}
+                    {(RUBROS_POR_ID[item.rubroId] || "otros").toUpperCase()}{" "}
                     {abierto ? "• Abierto" : "• Cerrado"}
                   </Text>
 
                   <Text style={styles.estrellas}>
-                    ⭐ {item.promedioEstrellas} estrellas (
-                    {item.totalResenas})
+                    ⭐ {item.puntaje} estrellas ({item.cantidadResenas})
                   </Text>
 
-                  {item.estaAbiertoPorVacaciones && (
+                  {cerradoPorVacaciones && (
                     <View style={styles.vacacionesBadge}>
                       <Text style={styles.vacacionesText}>
                         🏖️ Cerrado por vacaciones
@@ -441,8 +471,7 @@ const styles = StyleSheet.create({
   },
 
   rubrosContainer: {
-    height: 52,
-    maxHeight: 52,
+    minHeight: 60,
     marginBottom: 12,
     flexGrow: 0,
   },
@@ -450,6 +479,7 @@ const styles = StyleSheet.create({
   rubrosContenido: {
     alignItems: "center",
     paddingRight: 10,
+    paddingVertical: 4,
   },
 
   chipRubro: {
@@ -461,6 +491,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ddd",
     justifyContent: "center",
+    minHeight: 44,
+    alignItems: "center",
   },
 
   chipRubroActivo: {

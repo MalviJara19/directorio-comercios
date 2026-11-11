@@ -1,6 +1,5 @@
-
-import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -18,7 +17,12 @@ const opciones = [
   {
     icono: "🏪",
     titulo: "Datos del comercio",
-    descripcion: "Editá información, horarios, fotos y videos.",
+    descripcion: "Editá información, horarios y medios de pago.",
+  },
+  {
+    icono: "📷",
+    titulo: "Fotos y videos",
+    descripcion: "Administrá las imágenes y el video de tu comercio.",
   },
   {
     icono: "🎁",
@@ -85,8 +89,6 @@ export default function PerfilComercio() {
 
         <Text style={styles.nombre}>{usuario.nombre}</Text>
         <Text style={styles.email}>{usuario.email}</Text>
-        
-
 
         <View style={styles.separador} />
 
@@ -99,19 +101,27 @@ export default function PerfilComercio() {
             activeOpacity={0.7}
             onPress={() => {
               if (opcion.titulo === "Datos del comercio") {
-              router.push("/perfiles/datos-comercio");
+                router.push("/perfiles/datos-comercio");
+              } else if (opcion.titulo === "Fotos y videos") {
+                router.push("/perfiles/fotos-videos");
+              } else if (opcion.titulo === "Mis promociones") {
+                router.push("/perfiles/mis-promociones");
+              } else if (opcion.titulo === "Estadísticas") {
+                router.push("/perfiles/estadisticas");
+              } else if (opcion.titulo === "Validar promociones") {
+                router.push("/perfiles/validar-promociones");
+              } else if (opcion.titulo === "Reseñas") {
+                router.push("/perfiles/resenas-comercio");
               } else {
-              mostrarProximamente(opcion.titulo);
-             }
-           }}
-            >
+                mostrarProximamente(opcion.titulo);
+              }
+            }}
+          >
             <Text style={styles.iconoTarjeta}>{opcion.icono}</Text>
 
             <View style={styles.textosTarjeta}>
               <Text style={styles.tituloTarjeta}>{opcion.titulo}</Text>
-              <Text style={styles.descripcion}>
-                {opcion.descripcion}
-              </Text>
+              <Text style={styles.descripcion}>{opcion.descripcion}</Text>
             </View>
 
             <Text style={styles.flecha}>›</Text>
@@ -141,7 +151,7 @@ const styles = StyleSheet.create({
   },
   contenidoInterno: {
     padding: 20,
-    paddingBottom: 30,
+    paddingBottom: 120,
   },
   iconoPrincipal: {
     fontSize: 42,

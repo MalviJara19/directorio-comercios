@@ -11,8 +11,8 @@ import {
 } from "react-native";
 
 import { iniciarSesion } from "../../servicios/api";
-import { guardarToken, guardarUsuario } from "../../servicios/sesion";
 import { registrarDispositivoParaNotificaciones } from "../../servicios/notificaciones";
+import { guardarToken, guardarUsuario } from "../../servicios/sesion";
 
 export default function Login() {
   const router = useRouter();
@@ -53,10 +53,7 @@ export default function Login() {
       // Registrar el dispositivo para recibir notificaciones.
       await registrarDispositivoParaNotificaciones();
 
-      Alert.alert(
-        "¡Bienvenido!",
-        `Hola ${respuesta.datos.usuario.nombre}`,
-      );
+      Alert.alert("¡Bienvenido!", `Hola ${respuesta.datos.usuario.nombre}`);
 
       const rol = respuesta.datos.usuario.rol;
 
@@ -74,9 +71,12 @@ export default function Login() {
       );
 
       const mensaje =
+        error.response?.data?.error?.mensaje ||
         error.response?.data?.mensaje ||
         error.response?.data?.message ||
-        "No se pudo conectar con el servidor. Intentá nuevamente.";
+        (error.response?.status === 401
+          ? "Correo o contraseña incorrectos."
+          : "No se pudo conectar con el servidor. Intentá nuevamente.");
 
       Alert.alert("Error al iniciar sesión", mensaje);
     }
@@ -117,9 +117,7 @@ export default function Login() {
         </TouchableOpacity>
 
         <View style={styles.registerContainer}>
-          <Text style={styles.registerText}>
-            ¿Todavía no tenés una cuenta?
-          </Text>
+          <Text style={styles.registerText}>¿Todavía no tenés una cuenta?</Text>
 
           <Link href="/auth/registro" style={styles.registerLink}>
             Registrarme

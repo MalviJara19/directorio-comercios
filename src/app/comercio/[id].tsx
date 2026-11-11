@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Linking,
   ScrollView,
   StyleSheet,
@@ -117,16 +118,16 @@ export default function DetalleComercioScreen() {
 
       const datos = respuesta.data.datos || [];
 
-setResenas(datos);
+      setResenas(datos);
 
-setComercio((actual) =>
-  actual
-    ? {
-        ...actual,
-        cantidadResenas: respuesta.data.total ?? datos.length,
-      }
-    : actual
-);
+      setComercio((actual) =>
+        actual
+          ? {
+              ...actual,
+              cantidadResenas: respuesta.data.total ?? datos.length,
+            }
+          : actual
+      );
     } catch (error) {
       console.error("Error al cargar reseñas:", error);
       Alert.alert("Error", "No se pudieron cargar las reseñas.");
@@ -147,6 +148,17 @@ setComercio((actual) =>
         }
 
         const respuesta = await api.get(`/comercios/${id}`);
+
+        console.log(
+          "DETALLE COMPLETO DEL COMERCIO:",
+          JSON.stringify(respuesta.data.datos, null, 2),
+        );
+
+        console.log(
+          "IMÁGENES DEL COMERCIO:",
+          JSON.stringify(respuesta.data.datos?.imagenes, null, 2),
+        );
+
         setComercio(respuesta.data.datos);
 
         await cargarResenas();
@@ -302,9 +314,7 @@ setComercio((actual) =>
     return (
       <View style={styles.centrado}>
         <ActivityIndicator size="large" color="#0a7ea4" />
-        <Text style={{ marginTop: 8 }}>
-          Cargando ficha del comercio...
-        </Text>
+        <Text style={{ marginTop: 8 }}>Cargando ficha del comercio...</Text>
       </View>
     );
   }
@@ -312,9 +322,7 @@ setComercio((actual) =>
   if (!comercio) {
     return (
       <View style={styles.container}>
-        <Text style={styles.errorText}>
-          No se encontró el comercio.
-        </Text>
+        <Text style={styles.errorText}>No se encontró el comercio.</Text>
 
         <TouchableOpacity
           onPress={() => router.back()}
@@ -326,8 +334,7 @@ setComercio((actual) =>
     );
   }
 
-  const nombreRubro =
-    NOMBRES_RUBROS[comercio.rubroId] || comercio.rubroId;
+  const nombreRubro = NOMBRES_RUBROS[comercio.rubroId] || comercio.rubroId;
 
   const latitud = comercio.coordenadas?.latitud ?? 0;
   const longitud = comercio.coordenadas?.longitud ?? 0;
@@ -343,6 +350,7 @@ setComercio((actual) =>
   return (
     <ScrollView
       style={styles.container}
+      contentContainerStyle={{ paddingBottom: 120 }}
       showsVerticalScrollIndicator={false}
     >
       <TouchableOpacity
@@ -362,11 +370,26 @@ setComercio((actual) =>
         ⭐ {comercio.puntaje} ({comercio.cantidadResenas} reseñas)
       </Text>
 
+      {comercio.imagenes?.length > 0 && (
+        <View style={styles.seccion}>
+          <Text style={styles.subtituloSeccion}>📸 Fotos del comercio</Text>
+
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            {comercio.imagenes.map((imagen, indice) => (
+              <Image
+                key={indice}
+                source={{ uri: imagen }}
+                style={styles.imagenComercio}
+                resizeMode="cover"
+              />
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       {comercio.videoUrl ? (
         <View style={styles.seccionVideo}>
-          <Text style={styles.tituloVideo}>
-            🎥 Video de Presentación
-          </Text>
+          <Text style={styles.tituloVideo}>🎥 Video de Presentación</Text>
 
           <VideoView
             player={player}
@@ -380,9 +403,7 @@ setComercio((actual) =>
         {comercio.telefono ? (
           <TouchableOpacity
             style={styles.botonAccion}
-            onPress={() =>
-              Linking.openURL(`tel:${comercio.telefono}`)
-            }
+            onPress={() => Linking.openURL(`tel:${comercio.telefono}`)}
           >
             <Text style={styles.textoBoton}>📞 Llamar</Text>
           </TouchableOpacity>
@@ -392,13 +413,12 @@ setComercio((actual) =>
           <TouchableOpacity
             style={[styles.botonAccion, styles.botonWhatsapp]}
             onPress={() => {
-              const numeroLimpio =
-                comercio.whatsapp?.replace(/\D/g, "") || "";
+              const numeroLimpio = comercio.whatsapp?.replace(/\D/g, "") || "";
 
               Linking.openURL(
-                `https://api.whatsapp.com/send?phone=${numeroLimpio}`
+                `https://api.whatsapp.com/send?phone=${numeroLimpio}`,
               ).catch((error) =>
-                console.error("Error al abrir WhatsApp:", error)
+                console.error("Error al abrir WhatsApp:", error),
               );
             }}
           >
@@ -418,20 +438,47 @@ setComercio((actual) =>
       </View>
 
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>
-          📄 Descripción
-        </Text>
-
+        <Text style={styles.subtituloSeccion}>📄 Descripción</Text>
         <Text style={styles.texto}>
           {comercio.descripcion || "Sin descripción disponible."}
         </Text>
       </View>
 
       <View style={styles.seccion}>
-        <Text style={styles.subtituloSeccion}>
-          💳 Medios de pago aceptados
-        </Text>
+        <Text style={styles.subtituloSeccion}>🕒 Horarios de atención</Text>
 
+        {comercio.horarios.length === 0 ? (
+          <Text style={styles.texto}>🏖️ Cerrado por vacaciones.</Text>
+        ) : (
+          [
+            "Domingo",
+            "Lunes",
+            "Martes",
+            "Miércoles",
+            "Jueves",
+            "Viernes",
+            "Sábado",
+          ].map((dia, indice) => {
+            const horariosDelDia = comercio.horarios.filter(
+              (h) => h.dia === indice,
+            );
+
+            return (
+              <Text key={dia} style={styles.texto}>
+                <Text style={{ fontWeight: "bold" }}>{dia}: </Text>
+                {horariosDelDia.length > 0
+                  ? horariosDelDia
+                      .map((h) => `${h.abre} a ${h.cierra}`)
+                      .join(" / ")
+                  : "Sin atención"}
+              </Text>
+            );
+          })
+        )}
+      </View>
+
+      <View style={styles.seccion}>
+        <Text style={styles.subtituloSeccion}>💳 Medios de pago aceptados</Text>
         <Text style={styles.texto}>
           {comercio.mediosDePago?.length
             ? comercio.mediosDePago.join(", ")
@@ -441,9 +488,7 @@ setComercio((actual) =>
 
       {comercio.instagram ? (
         <View style={styles.seccion}>
-          <Text style={styles.subtituloSeccion}>
-            📷 Instagram
-          </Text>
+          <Text style={styles.subtituloSeccion}>📷 Instagram</Text>
 
           <TouchableOpacity
             onPress={() => {
@@ -468,10 +513,7 @@ setComercio((actual) =>
 
         {usuarioActual?.rol === "vecino" && !miResena ? (
           <View style={styles.formularioResena}>
-            <Text style={styles.subtituloSeccion}>
-              Dejá tu opinión
-            </Text>
-
+            <Text style={styles.subtituloSeccion}>Dejá tu opinión</Text>
             <Text style={styles.etiqueta}>Tu puntuación:</Text>
 
             <View style={styles.selectorEstrellas}>
@@ -582,9 +624,7 @@ setComercio((actual) =>
                       <Text style={styles.textoBoton}>Guardar cambios</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity
-                      onPress={() => setResenaEditando(null)}
-                    >
+                    <TouchableOpacity onPress={() => setResenaEditando(null)}>
                       <Text style={styles.textoCancelar}>Cancelar</Text>
                     </TouchableOpacity>
                   </View>
@@ -933,5 +973,12 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 8,
     marginBottom: 5,
+  },
+  imagenComercio: {
+    width: 260,
+    height: 180,
+    borderRadius: 12,
+    marginRight: 12,
+    backgroundColor: "#eeeeee",
   },
 });

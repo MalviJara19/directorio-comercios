@@ -1,3 +1,4 @@
+
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
@@ -9,14 +10,28 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Button,
 } from "react-native";
 
-import { obtenerComercios } from "@/servicios/serviciosComercios";
-import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { obtenerComercios as obtenerComerciosApi } from "@/servicios/api";
+import { Comercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
-import { Button } from "react-native";
 
-const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
+type RubroComercio =
+  | "gastronomia"
+  | "indumentaria"
+  | "hogar"
+  | "ferreteria y construccion"
+  | "salud y farmacia"
+  | "servicios"
+  | "tecnologia"
+  | "libreria"
+  | "otros";
+
+const LISTA_RUBROS: {
+  label: string;
+  value: RubroComercio | "todos";
+}[] = [
   { label: "Todos", value: "todos" },
   { label: "Gastronomía", value: "gastronomia" },
   { label: "Indumentaria", value: "indumentaria" },
@@ -34,6 +49,7 @@ export default function HomeScreen() {
 
   const [comercios, setComercios] = useState<Comercio[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
+  const [errorCarga, setErrorCarga] = useState<string>("");
 
   const [busqueda, setBusqueda] = useState<string>("");
   const [rubroSeleccionado, setRubroSeleccionado] = useState<
@@ -44,14 +60,49 @@ export default function HomeScreen() {
   useEffect(() => {
     async function cargar() {
       try {
-        const datos = await obtenerComercios();
-        setComercios(datos);
+        setErrorCarga("");
+
+        const todosLosComercios: Comercio[] = [];
+        let pagina = 1;
+        let total = 0;
+
+        while (pagina === 1 || todosLosComercios.length < total) {
+          const respuesta = await obtenerComerciosApi(pagina, 20);
+
+          const datos = Array.isArray(respuesta)
+            ? respuesta
+            : respuesta?.datos;
+
+          if (!Array.isArray(datos)) {
+            throw new Error(
+              "La API no devolvió una lista válida de comercios.",
+            );
+          }
+
+          todosLosComercios.push(...datos);
+
+          total = Number(
+            respuesta?.meta?.total ?? todosLosComercios.length,
+          );
+
+          if (datos.length === 0 || datos.length < 20) {
+            break;
+          }
+
+          pagina++;
+        }
+
+        setComercios(todosLosComercios);
       } catch (error) {
         console.error("Error al cargar comercios:", error);
+        setErrorCarga(
+          "No se pudieron cargar los comercios. Verificá la conexión con el servidor.",
+        );
       } finally {
         setCargando(false);
       }
     }
+
     cargar();
   }, []);
 
@@ -67,12 +118,15 @@ export default function HomeScreen() {
     const coincideNombre = quitarAcentos(comercio.nombre).includes(
       busquedaLimpia,
     );
-    const coincideRubro = quitarAcentos(comercio.rubro).includes(
+
+    const coincideRubro = quitarAcentos(comercio.rubroId).includes(
       busquedaLimpia,
     );
+
     const coincideDireccion = quitarAcentos(comercio.direccion).includes(
       busquedaLimpia,
     );
+
     const coincideDescripcion = comercio.descripcion
       ? quitarAcentos(comercio.descripcion).includes(busquedaLimpia)
       : false;
@@ -84,9 +138,14 @@ export default function HomeScreen() {
       coincideDescripcion;
 
     if (!coincideTexto) return false;
-    if (rubroSeleccionado !== "todos" && comercio.rubro !== rubroSeleccionado) {
+
+    if (
+      rubroSeleccionado !== "todos" &&
+      comercio.rubroId !== rubroSeleccionado
+    ) {
       return false;
     }
+
     if (soloAbiertos && !estaAbiertoAhora(comercio.horarios)) {
       return false;
     }
@@ -100,12 +159,13 @@ export default function HomeScreen() {
         title="Cerrar sesión"
         onPress={() => router.replace("/auth/login")}
       />
+
       <Text style={styles.titulo}>Directorio de Comercios</Text>
+
       <Text style={styles.subtitulo}>
         Centro Comercial de Concepción del Uruguay
       </Text>
 
-      {/* 1. Buscador */}
       <TextInput
         style={styles.busqueda}
         placeholder="Buscar en la ciudad..."
@@ -113,7 +173,6 @@ export default function HomeScreen() {
         onChangeText={setBusqueda}
       />
 
-      {/* 2. Filtro horizontal por Rubro */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -122,6 +181,7 @@ export default function HomeScreen() {
       >
         {LISTA_RUBROS.map((r) => {
           const activo = rubroSeleccionado === r.value;
+
           return (
             <TouchableOpacity
               key={r.value}
@@ -138,7 +198,6 @@ export default function HomeScreen() {
         })}
       </ScrollView>
 
-      {/* 3. Filtro Abierto Ahora */}
       <TouchableOpacity
         style={[styles.botonAbierto, soloAbiertos && styles.botonAbiertoActivo]}
         onPress={() => setSoloAbiertos(!soloAbiertos)}
@@ -149,16 +208,21 @@ export default function HomeScreen() {
             soloAbiertos && styles.textoBotonActivo,
           ]}
         >
-          {soloAbiertos ? "✓ Abierto ahora (Filtrando)" : "⏱️ Abierto ahora"}
+          {soloAbiertos
+            ? "✓ Abierto ahora (Filtrando)"
+            : "⏱️ Abierto ahora"}
         </Text>
       </TouchableOpacity>
 
-      {/* Indicador de carga o Listado final */}
       {cargando ? (
         <View style={styles.cargandoContainer}>
           <ActivityIndicator size="large" color="#0a7ea4" />
-          <Text style={styles.textoCargando}>Cargando comercios...</Text>
+          <Text style={styles.textoCargando}>
+            Cargando comercios...
+          </Text>
         </View>
+      ) : errorCarga ? (
+        <Text style={styles.error}>{errorCarga}</Text>
       ) : (
         <FlatList
           data={comerciosFiltrados}
@@ -174,6 +238,11 @@ export default function HomeScreen() {
           }
           renderItem={({ item }) => {
             const abierto = estaAbiertoAhora(item.horarios);
+
+            const nombreRubro =
+              LISTA_RUBROS.find((r) => r.value === item.rubroId)?.label ??
+              item.rubroId;
+
             return (
               <TouchableOpacity
                 style={styles.card}
@@ -186,22 +255,14 @@ export default function HomeScreen() {
                 }
               >
                 <Text style={styles.comercio}>{item.nombre}</Text>
+
                 <Text style={styles.rubroTexto}>
-                  {item.rubro.toUpperCase()}{" "}
-                  {abierto ? "• Abierto" : "• Cerrado"}
+                  {nombreRubro} {abierto ? "• Abierto" : "• Cerrado"}
                 </Text>
 
                 <Text style={styles.estrellas}>
-                  ⭐ {item.promedioEstrellas} estrellas ({item.totalResenas})
+                  ⭐ {item.puntaje} estrellas ({item.cantidadResenas} reseñas)
                 </Text>
-
-                {item.estaAbiertoPorVacaciones && (
-                  <View style={styles.vacacionesBadge}>
-                    <Text style={styles.vacacionesText}>
-                      🏖️ Cerrado por vacaciones
-                    </Text>
-                  </View>
-                )}
               </TouchableOpacity>
             );
           }}
@@ -307,16 +368,6 @@ const styles = StyleSheet.create({
     color: "#444",
     marginTop: 2,
   },
-  vacacionesBadge: {
-    marginTop: 6,
-    backgroundColor: "#fff3e0",
-    padding: 4,
-    borderRadius: 4,
-  },
-  vacacionesText: {
-    fontSize: 12,
-    color: "#e65100",
-  },
   cargandoContainer: {
     flex: 1,
     justifyContent: "center",
@@ -329,6 +380,12 @@ const styles = StyleSheet.create({
   vacio: {
     textAlign: "center",
     color: "#777",
+    marginTop: 30,
+    fontSize: 14,
+  },
+  error: {
+    textAlign: "center",
+    color: "#c62828",
     marginTop: 30,
     fontSize: 14,
   },
