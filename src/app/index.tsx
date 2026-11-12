@@ -1,4 +1,5 @@
 
+import * as Network from "expo-network";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import * as Haptics from "expo-haptics";
@@ -15,6 +16,8 @@ import {
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
+import { obtenerComerciosGuardados, guardarComercios, guardarFavoritos, obtenerFavoritos, obtenerFavoritosPendientes, obtenerUltimaActualizacion, registrarFavoritoPendiente, eliminarFavoritoPendiente } from "@/servicios/base-datos";
+import { obtenerUsuario, obtenerToken } from "@/servicios/sesion";
 import { Comercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -24,7 +27,6 @@ import {
   obtenerMiPerfil,
   quitarFavorito,
 } from "../servicios/api";
-import { obtenerToken } from "../servicios/sesion";
 
 const RUBROS_POR_ID: Record<string, string> = {
   "rub-gastronomia": "gastronomia",
@@ -67,6 +69,40 @@ export default function HomeScreen() {
 
   const [favoritos, setFavoritos] = useState<string[]>([]);
   const [actualizando, setActualizando] = useState<string[]>([]);
+  const [ultimaActualizacion, setUltimaActualizacion] = useState<string | null>(
+    null,
+  );
+  const [hayConexion, setHayConexion] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let suscripcion: ReturnType<typeof Network.addNetworkStateListener>;
+
+    async function verificarConexion() {
+      const estado = await Network.getNetworkStateAsync();
+
+      setHayConexion(
+        estado.isConnected === true && estado.isInternetReachable !== false,
+      );
+    }
+
+    verificarConexion();
+
+    suscripcion = Network.addNetworkStateListener((estado) => {
+      setHayConexion(
+        estado.isConnected === true && estado.isInternetReachable !== false,
+      );
+    });
+
+    return () => {
+      suscripcion.remove();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (hayConexion === true) {
+      sincronizarFavoritosPendientes();
+    }
+  }, [hayConexion]);
 
   useEffect(() => {
     cargarComercios();
@@ -142,18 +178,53 @@ export default function HomeScreen() {
           activo: c.activo,
         }));
 
+      await guardarComercios(comerciosAdaptados);
+
+      const fecha = await obtenerUltimaActualizacion();
+      setUltimaActualizacion(fecha);
+
       setComercios(comerciosAdaptados);
 
       console.log("Comercios reales cargados:", comerciosAdaptados.length);
     } catch (error) {
-      console.error("Error al cargar comercios reales:", error);
-      Alert.alert("Error", "No se pudieron cargar los comercios.");
+      console.error("Error al cargar comercios desde la API:", error);
+
+      try {
+        const comerciosLocales = await obtenerComerciosGuardados();
+        const fecha = await obtenerUltimaActualizacion();
+        setUltimaActualizacion(fecha);
+
+        if (comerciosLocales.length > 0) {
+          setComercios(comerciosLocales);
+
+          console.log(
+            "Comercios recuperados desde SQLite:",
+            comerciosLocales.length,
+          );
+        } else {
+          Alert.alert(
+            "Sin conexión",
+            "No se pudieron cargar los comercios y todavía no hay datos guardados en el dispositivo.",
+          );
+        }
+      } catch (errorLocal) {
+        console.error("Error al recuperar comercios locales:", errorLocal);
+
+        Alert.alert("Error", "No se pudieron cargar los comercios.");
+      }
     } finally {
       setCargando(false);
     }
   }
 
   async function cargarFavoritos() {
+    const usuario = await obtenerUsuario();
+
+    if (!usuario?.id) {
+      setFavoritos([]);
+      return;
+    }
+
     try {
       const token = await obtenerToken();
 
@@ -180,9 +251,43 @@ export default function HomeScreen() {
 
       setFavoritos(idsFavoritos);
 
-      console.log("Favoritos de Home:", idsFavoritos);
+      await guardarFavoritos(usuario.id, idsFavoritos);
     } catch (error) {
-      console.log("No se pudieron cargar los favoritos:", error);
+      try {
+        const favoritosLocales = await obtenerFavoritos(usuario.id);
+
+        setFavoritos(favoritosLocales);
+      } catch (errorLocal) {
+        console.error("Error al recuperar favoritos locales:", errorLocal);
+      }
+    }
+  }
+
+  // Sincronizamos los cambios de favoritos pendientes con la API.
+  async function sincronizarFavoritosPendientes() {
+    const usuario = await obtenerUsuario();
+
+    if (!usuario?.id) {
+      return;
+    }
+
+    const pendientes = await obtenerFavoritosPendientes(usuario.id);
+
+    if (pendientes.length === 0) {
+      return;
+    }
+
+    for (const pendiente of pendientes) {
+      try {
+        if (pendiente.accion === "agregar") {
+          await agregarFavorito(pendiente.comercio_id);
+        } else {
+          await quitarFavorito(pendiente.comercio_id);
+        }
+
+        // Eliminamos el cambio de la cola cuando la API lo acepta.
+        await eliminarFavoritoPendiente(pendiente.id);
+      } catch (error) {}
     }
   }
 
@@ -212,39 +317,78 @@ export default function HomeScreen() {
       }
     } catch (error) {
       console.error("Error al verificar la sesión:", error);
+
       Alert.alert(
         "Error",
         "No se pudo verificar tu sesión. Intentá nuevamente.",
+      );
+
+      return;
+    }
+
+    const usuario = await obtenerUsuario();
+
+    if (!usuario?.id) {
+      Alert.alert(
+        "Sesión requerida",
+        "Iniciá sesión para guardar favoritos.",
       );
       return;
     }
 
     const yaEsFavorito = favoritos.includes(comercioId);
 
+    const nuevosFavoritos = yaEsFavorito
+      ? favoritos.filter((id) => id !== comercioId)
+      : [...favoritos, comercioId];
+
+    const accion = yaEsFavorito ? "quitar" : "agregar";
+
     try {
       setActualizando((actuales) => [...actuales, comercioId]);
 
-      if (yaEsFavorito) {
-        await quitarFavorito(comercioId);
+      // Actualizamos la pantalla y guardamos los favoritos en SQLite.
+      setFavoritos(nuevosFavoritos);
+      await guardarFavoritos(usuario.id, nuevosFavoritos);
 
-        setFavoritos((actuales) =>
-          actuales.filter((id) => id !== comercioId),
-        );
+      // Si no hay internet, dejamos el cambio pendiente.
+      if (hayConexion === false) {
+        await registrarFavoritoPendiente(usuario.id, comercioId, accion);
       } else {
-        await agregarFavorito(comercioId);
+        try {
+          // Si hay conexión, intentamos actualizar el favorito en la API.
+          if (yaEsFavorito) {
+            await quitarFavorito(comercioId);
+          } else {
+            await agregarFavorito(comercioId);
+          }
 
-        setFavoritos((actuales) => [...actuales, comercioId]);
+          // Si había un cambio pendiente para este comercio, lo eliminamos.
+          const pendientes = await obtenerFavoritosPendientes(usuario.id);
+
+          for (const pendiente of pendientes) {
+            if (pendiente.comercio_id === comercioId) {
+              await eliminarFavoritoPendiente(pendiente.id);
+            }
+          }
+        } catch (errorApi) {
+          // Si falla la API, conservamos el cambio para sincronizarlo después.
+          await registrarFavoritoPendiente(usuario.id, comercioId, accion);
+        }
       }
 
-      // Vibración suave al agregar o quitar un favorito.
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-
+      // Vibración normal al agregar o quitar un favorito.
+      try {
+        await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      } catch (error) {
+        console.log("Vibración no disponible:", error);
+      }
     } catch (error) {
-      console.error("Error al actualizar favorito:", error);
+      console.error("Error al guardar el favorito:", error);
 
       Alert.alert(
         "Error",
-        "No se pudo actualizar el favorito. Intentá nuevamente.",
+        "No se pudo guardar el favorito localmente. Intentá nuevamente.",
       );
     } finally {
       setActualizando((actuales) =>
@@ -355,6 +499,47 @@ export default function HomeScreen() {
           {soloAbiertos ? "✓ Abierto ahora (Filtrando)" : "⏱️ Abierto ahora"}
         </Text>
       </TouchableOpacity>
+
+      {hayConexion === false && (
+        <View
+          style={{
+            width: "90%",
+            alignSelf: "center",
+            padding: 10,
+            marginBottom: 8,
+            borderRadius: 8,
+            backgroundColor: hayConexion ? "#e8f5e9" : "#fff3e0",
+          }}
+        >
+          <Text
+            style={{
+              color: hayConexion ? "#2e7d32" : "#e65100",
+              fontSize: 12,
+              fontWeight: "600",
+            }}
+          >
+            {hayConexion ? "🟢 Con conexión a internet" : "🟠 Sin conexión."}
+          </Text>
+        </View>
+      )}
+
+      {hayConexion === false && ultimaActualizacion && (
+        <View
+          style={{
+            width: "90%",
+            alignSelf: "center",
+            padding: 10,
+            marginBottom: 8,
+            backgroundColor: "#e8f4f8",
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: "#24566b", fontSize: 12 }}>
+            ℹ️ Última actualización:{" "}
+            {new Date(ultimaActualizacion).toLocaleString("es-AR")}
+          </Text>
+        </View>
+      )}
 
       {cargando ? (
         <View style={styles.cargandoContainer}>

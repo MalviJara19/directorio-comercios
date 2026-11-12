@@ -10,6 +10,7 @@ import {
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
+import { obtenerMiComercio } from "@/servicios/api";
 import { cerrarSesion, obtenerUsuario } from "@/servicios/sesion";
 import type { Usuario } from "@/tipos/usuario";
 
@@ -49,11 +50,19 @@ const opciones = [
 export default function PerfilComercio() {
   const router = useRouter();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [comercio, setComercio] = useState<any>(null);
 
   useEffect(() => {
     async function cargarUsuario() {
       const datos = await obtenerUsuario();
       setUsuario(datos);
+
+      try {
+        const datosComercio = await obtenerMiComercio();
+        setComercio(datosComercio);
+      } catch (error) {
+        console.error("Error al cargar los datos del comercio:", error);
+      }
     }
 
     cargarUsuario();
@@ -88,6 +97,9 @@ export default function PerfilComercio() {
         <Text style={styles.titulo}>Mi comercio</Text>
 
         <Text style={styles.nombre}>{usuario.nombre}</Text>
+        {comercio?.descripcion ? (
+          <Text style={styles.descripcion}>{comercio.descripcion}</Text>
+        ) : null}
         <Text style={styles.email}>{usuario.email}</Text>
 
         <View style={styles.separador} />

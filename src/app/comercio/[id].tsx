@@ -17,6 +17,8 @@ import {
 
 import { api } from "@/servicios/api";
 import { obtenerUsuario } from "@/servicios/sesion";
+import { obtenerComerciosGuardados } from "@/servicios/base-datos";
+import * as FileSystem from "expo-file-system/legacy";
 
 type ComercioDetalle = {
   id: string;
@@ -75,6 +77,49 @@ const NOMBRES_RUBROS: Record<string, string> = {
   "rub-otros": "Otros",
 };
 
+async function descargarArchivo(
+  url: string,
+  comercioId: string,
+): Promise<string> {
+  const directorio = `${FileSystem.documentDirectory}comercios/${comercioId}/`;
+
+  await FileSystem.makeDirectoryAsync(directorio, {
+    intermediates: true,
+  });
+
+  const nombreArchivo = url.split("/").pop() || "archivo";
+
+  const rutaLocal = `${directorio}${nombreArchivo}`;
+
+  const archivoExiste = await FileSystem.getInfoAsync(rutaLocal);
+
+  if (archivoExiste.exists) {
+    return rutaLocal;
+  }
+
+  const descarga = await FileSystem.downloadAsync(url, rutaLocal);
+  const informacion = await FileSystem.getInfoAsync(descarga.uri);
+
+  if (informacion.exists && !informacion.isDirectory) {
+    console.log("TAMAÑO DEL VIDEO:", informacion.size, "bytes");
+  }
+
+  return descarga.uri;
+}
+
+async function obtenerArchivoLocal(
+  url: string,
+  comercioId: string,
+): Promise<string | null> {
+  const nombreArchivo = url.split("/").pop() || "archivo";
+
+  const rutaLocal = `${FileSystem.documentDirectory}comercios/${comercioId}/${nombreArchivo}`;
+
+  const archivo = await FileSystem.getInfoAsync(rutaLocal);
+
+  return archivo.exists ? rutaLocal : null;
+}
+
 export default function DetalleComercioScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
@@ -100,7 +145,7 @@ export default function DetalleComercioScreen() {
   const videoSource = comercio?.videoUrl || "";
 
   const player = useVideoPlayer(videoSource, (playerInstance) => {
-    playerInstance.loop = true;
+    playerInstance.loop = false;
   });
 
   async function cargarResenas() {
@@ -144,6 +189,7 @@ export default function DetalleComercioScreen() {
 
         if (!id) {
           setCargando(false);
+          setCargandoResenas(false);
           return;
         }
 
@@ -159,12 +205,78 @@ export default function DetalleComercioScreen() {
           JSON.stringify(respuesta.data.datos?.imagenes, null, 2),
         );
 
-        setComercio(respuesta.data.datos);
+        const comercioConFotos = respuesta.data.datos;
+
+        const imagenesLocales = await Promise.all(
+          (comercioConFotos.imagenes ?? []).map((url: string) =>
+            descargarArchivo(url, comercioConFotos.id),
+          ),
+        );
+
+        let videoLocal = comercioConFotos.videoUrl;
+
+        if (videoLocal) {
+          videoLocal = await descargarArchivo(
+            videoLocal,
+            comercioConFotos.id,
+          );
+        }
+
+        setComercio({
+          ...comercioConFotos,
+          imagenes: imagenesLocales,
+          videoUrl: videoLocal,
+        });
 
         await cargarResenas();
       } catch (error) {
-        console.error("Error al cargar el comercio:", error);
-        setComercio(null);
+        console.log("Sin conexión. Buscando el comercio en SQLite...");
+
+        try {
+          const comerciosLocales = await obtenerComerciosGuardados();
+
+          const comercioLocal = comerciosLocales.find(
+            (comercio) => comercio.id === id,
+          );
+
+          if (comercioLocal) {
+            const imagenesLocales = await Promise.all(
+              (comercioLocal.imagenes ?? []).map(async (url: string) => {
+                return await obtenerArchivoLocal(url, comercioLocal.id);
+              }),
+            );
+
+            let videoLocal: string | null = null;
+
+            if (comercioLocal.videoUrl) {
+              videoLocal = await obtenerArchivoLocal(
+                comercioLocal.videoUrl,
+                comercioLocal.id,
+              );
+            }
+
+            setComercio({
+              ...comercioLocal,
+              imagenes: imagenesLocales.filter(
+                (imagen): imagen is string => imagen !== null,
+              ),
+              videoUrl: videoLocal,
+            });
+
+            console.log(
+              "Detalle recuperado desde SQLite:",
+              comercioLocal.nombre,
+            );
+          } else {
+            setComercio(null);
+            console.log("El comercio no está guardado en SQLite.");
+          }
+        } catch (errorLocal) {
+          console.error("Error al recuperar el detalle local:", errorLocal);
+          setComercio(null);
+        } finally {
+          setCargandoResenas(false);
+        }
       } finally {
         setCargando(false);
       }
@@ -394,7 +506,8 @@ export default function DetalleComercioScreen() {
           <VideoView
             player={player}
             style={styles.video}
-            nativeControls={true}
+            nativeControls
+            contentFit="contain"
           />
         </View>
       ) : null}
