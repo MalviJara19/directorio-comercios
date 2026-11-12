@@ -1,6 +1,7 @@
 
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
+import * as Haptics from "expo-haptics";
 import {
   ActivityIndicator,
   Alert,
@@ -234,6 +235,10 @@ export default function HomeScreen() {
 
         setFavoritos((actuales) => [...actuales, comercioId]);
       }
+
+      // Vibración suave al agregar o quitar un favorito.
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     } catch (error) {
       console.error("Error al actualizar favorito:", error);
 
