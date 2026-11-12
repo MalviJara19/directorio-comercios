@@ -1,3 +1,8 @@
+import { useEffect } from "react";
+import { inicializarBaseDatos } from "@/servicios/base-datos";
+
+
+
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 
 import * as SplashScreen from "expo-splash-screen";
@@ -14,6 +19,15 @@ SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+    useEffect(() => {
+    inicializarBaseDatos()
+      .then(() => {
+        console.log("SQLite está listo para utilizarse.");
+      })
+      .catch((error) => {
+        console.error("Error al inicializar SQLite:", error);
+      });
+  }, []);
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
