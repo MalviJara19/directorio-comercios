@@ -260,3 +260,13 @@ export async function responderResena(
 
   return respuesta.data.datos;
 }
+// Actualizar datos personales de la cuenta.
+export async function actualizarDatosCuenta(datos: {
+  nombre?: string;
+  email?: string;
+  contrasenaActual?: string;
+  nuevaContrasena?: string;
+}) {
+  const respuesta = await api.patch("/yo/cuenta", datos);
+  return respuesta.data.datos;
+}

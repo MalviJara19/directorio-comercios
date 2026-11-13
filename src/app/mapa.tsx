@@ -3,12 +3,15 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
+  TextInput,
   View,
   Alert,
   TouchableOpacity,
   FlatList,
   Linking,
   ActivityIndicator,
+  Keyboard,
+  TouchableWithoutFeedback,
 } from 'react-native';
 
 import MapView, { Marker, Region } from 'react-native-maps';
@@ -64,6 +67,14 @@ function calcularDistancia(
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function normalizarTexto(texto: string) {
+  return texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export default function MapaScreen() {
   const mapaRef = useRef<MapView>(null);
 
@@ -71,6 +82,7 @@ export default function MapaScreen() {
     useState<Location.LocationObjectCoords | null>(null);
 
   const [filtro, setFiltro] = useState('Todos');
+  const [busqueda, setBusqueda] = useState('');
 
   const [seleccionado, setSeleccionado] =
     useState<Comercio | null>(null);
@@ -81,7 +93,7 @@ export default function MapaScreen() {
 
   useEffect(() => {
     cargarComercios();
-    obtenerUbicacion();
+    preguntarUbicacion();
   }, []);
 
   async function cargarComercios() {
@@ -185,15 +197,68 @@ export default function MapaScreen() {
     }
   }
 
-  async function obtenerUbicacion() {
+  async function preguntarUbicacion() {
+    try {
+      const permisoActual =
+        await Location.getForegroundPermissionsAsync();
+
+      if (permisoActual.status === 'granted') {
+        await obtenerUbicacion();
+        return;
+      }
+
+      if (!permisoActual.canAskAgain) {
+        Alert.alert(
+          'Ubicación desactivada',
+          'Para utilizar tu ubicación, habilitá el permiso desde la configuración de tu dispositivo.',
+          [
+            {
+              text: 'Ahora no',
+              style: 'cancel',
+            },
+            {
+              text: 'Ir a configuración',
+              onPress: () => Linking.openSettings(),
+            },
+          ]
+        );
+        return;
+      }
+
+      Alert.alert(
+        '¿Querés habilitar tu ubicación?',
+        'Esto nos permitirá mostrarte los comercios cercanos y calcular la distancia hasta ellos.',
+        [
+          {
+            text: 'Ahora no',
+            style: 'cancel',
+          },
+          {
+            text: 'Habilitar',
+            onPress: () => solicitarPermisoUbicacion(),
+          },
+        ]
+      );
+    } catch (error) {
+      console.log('Error al consultar el permiso:', error);
+    }
+  }
+
+  async function solicitarPermisoUbicacion() {
     try {
       const permiso =
         await Location.requestForegroundPermissionsAsync();
 
-      if (permiso.status !== 'granted') {
-        return;
+      if (permiso.status === 'granted') {
+        await obtenerUbicacion();
       }
+    } catch (error) {
+      console.log('Error al solicitar permiso:', error);
+    }
+  }
 
+  async function obtenerUbicacion() {
+    try {
       const posicion = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
@@ -210,10 +275,17 @@ export default function MapaScreen() {
   ];
 
   const comerciosFiltrados = comercios
-    .filter(
-      (comercio) =>
-        filtro === 'Todos' || comercio.rubro === filtro
-    )
+    .filter((comercio) => {
+      const coincideRubro =
+        filtro === 'Todos' || comercio.rubro === filtro;
+
+      const coincideBusqueda =
+        normalizarTexto(comercio.nombre).includes(
+          normalizarTexto(busqueda)
+        );
+
+      return coincideRubro && coincideBusqueda;
+    })
     .map((comercio) => ({
       ...comercio,
       distancia: ubicacion
@@ -234,19 +306,25 @@ export default function MapaScreen() {
     });
 
   function centrarComercio(comercio: Comercio) {
+    Keyboard.dismiss();
     setSeleccionado(comercio);
 
-    mapaRef.current?.animateToRegion({
-      latitude: comercio.latitud,
-      longitude: comercio.longitud,
-      latitudeDelta: 0.02,
-      longitudeDelta: 0.02,
-    });
+    mapaRef.current?.animateToRegion(
+      {
+        latitude: comercio.latitud,
+        longitude: comercio.longitud,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      },
+      800
+    );
   }
 
   function centrarMiUbicacion() {
+    Keyboard.dismiss();
+
     if (!ubicacion) {
-      obtenerUbicacion();
+      preguntarUbicacion();
       return;
     }
 
@@ -262,6 +340,8 @@ export default function MapaScreen() {
     comercio: Comercio,
     modo: 'walking' | 'driving'
   ) {
+    Keyboard.dismiss();
+
     const url =
       `https://www.google.com/maps/dir/?api=1` +
       `&destination=${comercio.latitud},${comercio.longitud}` +
@@ -275,158 +355,203 @@ export default function MapaScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.contenido}>
-        <Text style={styles.titulo}>📍 Mapa</Text>
+    <TouchableWithoutFeedback
+      onPress={Keyboard.dismiss}
+      accessible={false}
+    >
+      <SafeAreaView style={styles.container}>
+        <View style={styles.contenido}>
+          <Text style={styles.titulo}>📍 Mapa</Text>
 
-        <Text style={styles.subtitulo}>
-          Encontrá comercios cerca tuyo
-        </Text>
+          <Text style={styles.subtitulo}>
+            Encontrá comercios cerca tuyo
+          </Text>
 
-        <View style={styles.filtros}>
-          {nombresRubros.map((rubro) => (
-            <TouchableOpacity
-              key={rubro}
-              style={[
-                styles.filtro,
-                filtro === rubro && styles.filtroActivo,
-              ]}
-              onPress={() => setFiltro(rubro)}
-            >
-              <Text
-                style={
-                  filtro === rubro
-                    ? styles.textoFiltroActivo
-                    : styles.textoFiltro
-                }
+          <View
+            style={styles.contenedorBusqueda}
+            onStartShouldSetResponder={() => true}
+            onResponderGrant={() => {}}
+          >
+            <Text style={styles.iconoBusqueda}>⌕</Text>
+
+            <TextInput
+              style={styles.inputBusqueda}
+              placeholder="Buscar comercio por nombre..."
+              placeholderTextColor="#888"
+              value={busqueda}
+              onChangeText={setBusqueda}
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="search"
+              onFocus={() => {}}
+            />
+
+            {busqueda.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setBusqueda('')}
+                hitSlop={10}
               >
-                {rubro}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+                <Text style={styles.limpiarBusqueda}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
-        <View style={styles.mapaContenedor}>
-          <MapView
-            ref={mapaRef}
-            style={styles.mapa}
-            initialRegion={REGION_INICIAL}
-            showsUserLocation={true}
-            showsMyLocationButton={false}
-          >
-            {comerciosFiltrados.map((comercio) => (
-              <Marker
-                key={comercio.id}
-                coordinate={{
-                  latitude: comercio.latitud,
-                  longitude: comercio.longitud,
+          <View style={styles.filtros}>
+            {nombresRubros.map((rubro) => (
+              <TouchableOpacity
+                key={rubro}
+                style={[
+                  styles.filtro,
+                  filtro === rubro && styles.filtroActivo,
+                ]}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  setFiltro(rubro);
                 }}
-                title={comercio.nombre}
-                description={comercio.direccion}
-                onPress={() => setSeleccionado(comercio)}
-              />
+              >
+                <Text
+                  style={
+                    filtro === rubro
+                      ? styles.textoFiltroActivo
+                      : styles.textoFiltro
+                  }
+                >
+                  {rubro}
+                </Text>
+              </TouchableOpacity>
             ))}
-          </MapView>
+          </View>
 
-          <TouchableOpacity
-            style={styles.botonUbicacion}
-            onPress={centrarMiUbicacion}
-          >
-            <Text style={styles.iconoUbicacion}>📍</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.encabezadoLista}>
-          <Text style={styles.tituloLista}>
-            Comercios encontrados ({comerciosFiltrados.length})
-          </Text>
-
-          {cargando && <ActivityIndicator color="#347a54" />}
-        </View>
-
-        <FlatList
-          style={styles.lista}
-          data={comerciosFiltrados}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={styles.listaContenido}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.tarjeta}
-              onPress={() => centrarComercio(item)}
+          <View style={styles.mapaContenedor}>
+            <MapView
+              ref={mapaRef}
+              style={styles.mapa}
+              initialRegion={REGION_INICIAL}
+              showsUserLocation={!!ubicacion}
+              showsMyLocationButton={false}
+              onPress={() => Keyboard.dismiss()}
             >
-              <View style={styles.infoComercio}>
-                <Text style={styles.nombre}>
-                  {item.nombre}
-                </Text>
+              {comerciosFiltrados.map((comercio) => (
+                <Marker
+                  key={comercio.id}
+                  coordinate={{
+                    latitude: comercio.latitud,
+                    longitude: comercio.longitud,
+                  }}
+                  title={comercio.nombre}
+                  description={comercio.direccion}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    setSeleccionado(comercio);
+                  }}
+                />
+              ))}
+            </MapView>
 
-                <Text style={styles.detalle}>
-                  {item.rubro} · {item.direccion}
-                </Text>
+            <TouchableOpacity
+              style={styles.botonUbicacion}
+              onPress={centrarMiUbicacion}
+            >
+              <Text style={styles.iconoUbicacion}>📍</Text>
+            </TouchableOpacity>
+          </View>
 
-                {item.distancia !== null && (
-                  <Text style={styles.distancia}>
-                    A {item.distancia.toFixed(2)} km de tu ubicación
+          <View style={styles.encabezadoLista}>
+            <Text style={styles.tituloLista}>
+              Comercios encontrados ({comerciosFiltrados.length})
+            </Text>
+
+            {cargando && <ActivityIndicator color="#347a54" />}
+          </View>
+
+          <FlatList
+            style={styles.lista}
+            data={comerciosFiltrados}
+            keyExtractor={(item) => String(item.id)}
+            contentContainerStyle={styles.listaContenido}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            onScrollBeginDrag={() => Keyboard.dismiss()}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.tarjeta}
+                onPress={() => centrarComercio(item)}
+              >
+                <View style={styles.infoComercio}>
+                  <Text style={styles.nombre}>
+                    {item.nombre}
                   </Text>
-                )}
-              </View>
 
-              <Text style={styles.flecha}>›</Text>
-            </TouchableOpacity>
-          )}
-          ListEmptyComponent={
-            <Text style={styles.vacio}>
-              {cargando
-                ? 'Cargando comercios...'
-                : 'No hay comercios disponibles.'}
-            </Text>
-          }
-        />
-      </View>
+                  <Text style={styles.detalle}>
+                    {item.rubro} · {item.direccion}
+                  </Text>
 
-      {seleccionado && (
-        <View style={styles.panelRutas}>
-          <View style={styles.encabezadoRuta}>
-            <Text style={styles.nombre} numberOfLines={1}>
-              {seleccionado.nombre}
-            </Text>
+                  {item.distancia !== null && (
+                    <Text style={styles.distancia}>
+                      A {item.distancia.toFixed(2)} km de tu ubicación
+                    </Text>
+                  )}
+                </View>
 
-            <TouchableOpacity
-              onPress={() => setSeleccionado(null)}
-              hitSlop={10}
-            >
-              <Text style={styles.cerrar}>✕</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.detalle} numberOfLines={2}>
-            {seleccionado.direccion}
-          </Text>
-
-          <View style={styles.botonesRuta}>
-            <TouchableOpacity
-              style={styles.botonRuta}
-              onPress={() => abrirRuta(seleccionado, 'walking')}
-            >
-              <Text style={styles.textoRuta}>
-                🚶 Caminando
+                <Text style={styles.flecha}>›</Text>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <Text style={styles.vacio}>
+                {cargando
+                  ? 'Cargando comercios...'
+                  : busqueda.trim().length > 0
+                    ? 'No encontramos comercios con ese nombre.'
+                    : 'No hay comercios disponibles.'}
               </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.botonRuta}
-              onPress={() => abrirRuta(seleccionado, 'driving')}
-            >
-              <Text style={styles.textoRuta}>
-                🚗 En auto
-              </Text>
-            </TouchableOpacity>
-          </View>
+            }
+          />
         </View>
-      )}
 
-      <AppTabs />
-    </SafeAreaView>
+        {seleccionado && (
+          <View style={styles.panelRutas}>
+            <View style={styles.encabezadoRuta}>
+              <Text style={styles.nombre} numberOfLines={1}>
+                {seleccionado.nombre}
+              </Text>
+
+              <TouchableOpacity
+                onPress={() => setSeleccionado(null)}
+                hitSlop={10}
+              >
+                <Text style={styles.cerrar}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.detalle} numberOfLines={2}>
+              {seleccionado.direccion}
+            </Text>
+
+            <View style={styles.botonesRuta}>
+              <TouchableOpacity
+                style={styles.botonRuta}
+                onPress={() => abrirRuta(seleccionado, 'walking')}
+              >
+                <Text style={styles.textoRuta}>
+                  🚶 Caminando
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.botonRuta}
+                onPress={() => abrirRuta(seleccionado, 'driving')}
+              >
+                <Text style={styles.textoRuta}>
+                  🚗 En auto
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        <AppTabs />
+      </SafeAreaView>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -452,6 +577,37 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#666',
     marginBottom: 15,
+  },
+
+  contenedorBusqueda: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f2f2f2',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 48,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#e5e5e5',
+  },
+
+  iconoBusqueda: {
+    fontSize: 25,
+    color: '#666',
+    marginRight: 8,
+  },
+
+  inputBusqueda: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    paddingVertical: 8,
+  },
+
+  limpiarBusqueda: {
+    fontSize: 18,
+    color: '#777',
+    paddingHorizontal: 8,
   },
 
   filtros: {

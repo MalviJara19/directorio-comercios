@@ -1,7 +1,7 @@
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useVideoPlayer, VideoView } from "expo-video";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,8 +17,15 @@ import {
 
 import { api } from "@/servicios/api";
 import { obtenerUsuario } from "@/servicios/sesion";
-import { obtenerComerciosGuardados } from "@/servicios/base-datos";
+import {
+  obtenerComerciosGuardados,
+  guardarResenaPendiente,
+  obtenerResenasPendientes,
+  eliminarResenaPendiente,
+  type ResenaPendiente,
+} from "@/servicios/base-datos";
 import * as FileSystem from "expo-file-system/legacy";
+import * as Network from "expo-network";
 
 type ComercioDetalle = {
   id: string;
@@ -88,7 +95,6 @@ async function descargarArchivo(
   });
 
   const nombreArchivo = url.split("/").pop() || "archivo";
-
   const rutaLocal = `${directorio}${nombreArchivo}`;
 
   const archivoExiste = await FileSystem.getInfoAsync(rutaLocal);
@@ -142,13 +148,41 @@ export default function DetalleComercioScreen() {
   const [resenaRespondiendo, setResenaRespondiendo] = useState<string | null>(null);
   const [textoRespuesta, setTextoRespuesta] = useState("");
 
+  // Evita que se ejecuten dos sincronizaciones al mismo tiempo.
+  const sincronizandoResenas = useRef(false);
+
   const videoSource = comercio?.videoUrl || "";
 
   const player = useVideoPlayer(videoSource, (playerInstance) => {
     playerInstance.loop = false;
   });
 
-  async function cargarResenas() {
+  // Convierte las reseñas guardadas en SQLite al formato de la pantalla.
+  function convertirResenasPendientes(
+    pendientes: ResenaPendiente[],
+    nombreUsuario?: string,
+  ): Resena[] {
+    return pendientes
+      .filter((resena) => resena.comercioId === id)
+      .map((resena) => ({
+        id: resena.id,
+        comercioId: resena.comercioId,
+        usuarioId: resena.usuarioId,
+        nombreUsuario: nombreUsuario || "Vos",
+        estrellas: resena.estrellas,
+        comentario: resena.comentario,
+        respuesta: null,
+        reportada: false,
+        creadaEn: resena.creadaEn,
+        sincronizada: false,
+      }));
+  }
+
+  // Carga las reseñas del servidor y las pendientes de SQLite.
+  async function cargarResenas(
+    usuarioId: string | null = usuarioActual?.id ?? null,
+    nombreUsuario?: string,
+  ) {
     if (!id) {
       setCargandoResenas(false);
       return;
@@ -157,34 +191,158 @@ export default function DetalleComercioScreen() {
     try {
       setCargandoResenas(true);
 
-      const respuesta = await api.get(`/comercios/${id}/resenas`, {
-        params: { pagina: 1, porPagina: 50 },
-      });
+      let datosServidor: Resena[] = [];
 
-      const datos = respuesta.data.datos || [];
+      try {
+        const respuesta = await api.get(`/comercios/${id}/resenas`, {
+          params: { pagina: 1, porPagina: 50 },
+        });
 
-      setResenas(datos);
+        datosServidor = respuesta.data.datos || [];
 
-      setComercio((actual) =>
-        actual
-          ? {
-              ...actual,
-              cantidadResenas: respuesta.data.total ?? datos.length,
-            }
-          : actual
+        setComercio((actual) =>
+          actual
+            ? {
+                ...actual,
+                cantidadResenas:
+                  respuesta.data.total ?? datosServidor.length,
+              }
+            : actual,
+        );
+      } catch (error) {
+        console.log(
+          "No se pudieron cargar las reseñas del servidor. Se mostrarán las locales.",
+        );
+      }
+
+      let pendientes: ResenaPendiente[] = [];
+
+      if (usuarioId) {
+        pendientes = await obtenerResenasPendientes(usuarioId);
+      }
+
+      const resenasLocales = convertirResenasPendientes(
+        pendientes,
+        nombreUsuario || usuarioActual?.nombre,
       );
+
+      // Evita mostrar dos veces una misma reseña.
+      const idsServidor = new Set(datosServidor.map((resena) => resena.id));
+
+      const resenasLocalesFiltradas = resenasLocales.filter(
+        (resena) => !idsServidor.has(resena.id),
+      );
+
+      setResenas([...resenasLocalesFiltradas, ...datosServidor]);
     } catch (error) {
       console.error("Error al cargar reseñas:", error);
-      Alert.alert("Error", "No se pudieron cargar las reseñas.");
     } finally {
       setCargandoResenas(false);
     }
   }
 
+  // Envía al servidor las reseñas que quedaron pendientes en SQLite.
+  async function sincronizarResenasPendientes(
+    usuarioId: string,
+  ): Promise<number> {
+    if (sincronizandoResenas.current) {
+      return 0;
+    }
+
+    sincronizandoResenas.current = true;
+
+    let cantidadSincronizada = 0;
+
+    try {
+      const estadoRed = await Network.getNetworkStateAsync();
+
+      const hayInternet =
+        estadoRed.isConnected === true &&
+        estadoRed.isInternetReachable !== false;
+
+      if (!hayInternet) {
+        console.log("Sin conexión. Las reseñas siguen guardadas localmente.");
+        return 0;
+      }
+
+      const pendientes = await obtenerResenasPendientes(usuarioId);
+
+      for (const resena of pendientes) {
+        try {
+          await api.post(`/comercios/${resena.comercioId}/resenas`, {
+            id: resena.id,
+            estrellas: resena.estrellas,
+            comentario: resena.comentario,
+            creadaEn: resena.creadaEn,
+          });
+
+          // Solo se elimina de SQLite cuando el servidor confirma el envío.
+          await eliminarResenaPendiente(resena.id);
+
+          cantidadSincronizada++;
+
+          console.log("Reseña sincronizada correctamente:", resena.id);
+        } catch (error: any) {
+          console.log(
+            "La reseña continúa pendiente:",
+            resena.id,
+            error?.response?.data?.mensaje || error?.message,
+          );
+
+          // Si falla el envío, se conserva en SQLite para volver a intentarlo.
+        }
+      }
+    } catch (error) {
+      console.error("Error durante la sincronización de reseñas:", error);
+    } finally {
+      sincronizandoResenas.current = false;
+    }
+
+    return cantidadSincronizada;
+  }
+
+  // Detecta cuando vuelve Internet y sincroniza las reseñas pendientes.
+  useEffect(() => {
+    if (!usuarioActual?.id) {
+      return;
+    }
+
+    const usuarioId = usuarioActual.id;
+
+    const suscripcion = Network.addNetworkStateListener((estado) => {
+      const hayInternet =
+        estado.isConnected === true &&
+        estado.isInternetReachable !== false;
+
+      if (hayInternet) {
+        sincronizarResenasPendientes(usuarioId).then((cantidad) => {
+          if (cantidad > 0) {
+            cargarResenas(usuarioId, usuarioActual.nombre);
+          }
+        });
+      }
+    });
+
+    // También intenta sincronizar al abrir la pantalla.
+    sincronizarResenasPendientes(usuarioId).then((cantidad) => {
+      if (cantidad > 0) {
+        cargarResenas(usuarioId, usuarioActual.nombre);
+      }
+    });
+
+    return () => {
+      suscripcion.remove();
+    };
+  }, [usuarioActual?.id, id]);
+
   useEffect(() => {
     async function cargarDatos() {
+      let usuarioCargado: UsuarioActual | null = null;
+
       try {
         const usuario = await obtenerUsuario();
+
+        usuarioCargado = usuario;
         setUsuarioActual(usuario);
 
         if (!id) {
@@ -228,7 +386,7 @@ export default function DetalleComercioScreen() {
           videoUrl: videoLocal,
         });
 
-        await cargarResenas();
+        await cargarResenas(usuario?.id ?? null, usuario?.nombre);
       } catch (error) {
         console.log("Sin conexión. Buscando el comercio en SQLite...");
 
@@ -274,9 +432,13 @@ export default function DetalleComercioScreen() {
         } catch (errorLocal) {
           console.error("Error al recuperar el detalle local:", errorLocal);
           setComercio(null);
-        } finally {
-          setCargandoResenas(false);
         }
+
+        // Aunque no haya Internet, recuperamos las reseñas pendientes.
+        await cargarResenas(
+          usuarioCargado?.id ?? null,
+          usuarioCargado?.nombre,
+        );
       } finally {
         setCargando(false);
       }
@@ -285,31 +447,73 @@ export default function DetalleComercioScreen() {
     cargarDatos();
   }, [id]);
 
+  // Guarda primero la reseña localmente y después intenta enviarla.
   async function publicarResena() {
     if (!comentario.trim()) {
-      Alert.alert("Falta el comentario", "Escribí tu opinión antes de publicar.");
+      Alert.alert(
+        "Falta el comentario",
+        "Escribí tu opinión antes de publicar.",
+      );
+      return;
+    }
+
+    if (!id || !usuarioActual || usuarioActual.rol !== "vecino") {
+      Alert.alert(
+        "No se puede publicar",
+        "Necesitás iniciar sesión como vecino para publicar una reseña.",
+      );
       return;
     }
 
     try {
       setGuardandoResena(true);
 
-      await api.post(`/comercios/${id}/resenas`, {
-        estrellas,
+      const nuevaResena: ResenaPendiente = {
+        id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        comercioId: id,
+        usuarioId: usuarioActual.id,
+        estrellas: estrellas as 1 | 2 | 3 | 4 | 5,
         comentario: comentario.trim(),
-      });
+        creadaEn: new Date().toISOString(),
+        sincronizada: false,
+      };
+
+      // Primero se guarda en SQLite.
+      await guardarResenaPendiente(nuevaResena);
 
       setComentario("");
       setEstrellas(5);
 
-      Alert.alert("¡Listo!", "Tu reseña fue publicada.");
-      await cargarResenas();
+      // Se muestra inmediatamente en la pantalla.
+      await cargarResenas(usuarioActual.id, usuarioActual.nombre);
+
+      // Después se intenta enviar al servidor.
+      await sincronizarResenasPendientes(usuarioActual.id);
+
+      const pendientesActuales = await obtenerResenasPendientes(
+        usuarioActual.id,
+      );
+
+      const siguePendiente = pendientesActuales.some(
+        (resena) => resena.id === nuevaResena.id,
+      );
+
+      if (siguePendiente) {
+        Alert.alert(
+          "Reseña guardada",
+          "Tu reseña quedó guardada en este dispositivo. Se enviará automáticamente cuando recuperes la conexión.",
+        );
+      } else {
+        Alert.alert("¡Listo!", "Tu reseña fue publicada.");
+        await cargarResenas(usuarioActual.id, usuarioActual.nombre);
+      }
     } catch (error: any) {
-      console.error("Error al publicar reseña:", error);
+      console.error("Error al guardar reseña:", error);
+
       Alert.alert(
-        "No se pudo publicar",
+        "No se pudo guardar",
         error?.response?.data?.mensaje ||
-          "Verificá que hayas iniciado sesión y que no tengas otra reseña para este comercio."
+          "No se pudo guardar la reseña en el dispositivo. Intentá nuevamente.",
       );
     } finally {
       setGuardandoResena(false);
@@ -337,7 +541,7 @@ export default function DetalleComercioScreen() {
       console.error("Error al editar reseña:", error);
       Alert.alert(
         "Error",
-        error?.response?.data?.mensaje || "No se pudo editar la reseña."
+        error?.response?.data?.mensaje || "No se pudo editar la reseña.",
       );
     }
   }
@@ -360,12 +564,13 @@ export default function DetalleComercioScreen() {
               console.error("Error al eliminar reseña:", error);
               Alert.alert(
                 "Error",
-                error?.response?.data?.mensaje || "No se pudo eliminar la reseña."
+                error?.response?.data?.mensaje ||
+                  "No se pudo eliminar la reseña.",
               );
             }
           },
         },
-      ]
+      ],
     );
   }
 
@@ -387,18 +592,22 @@ export default function DetalleComercioScreen() {
               console.error("Error al denunciar reseña:", error);
               Alert.alert(
                 "Error",
-                error?.response?.data?.mensaje || "No se pudo denunciar la reseña."
+                error?.response?.data?.mensaje ||
+                  "No se pudo denunciar la reseña.",
               );
             }
           },
         },
-      ]
+      ],
     );
   }
 
   async function enviarRespuesta(resenaId: string) {
     if (!textoRespuesta.trim()) {
-      Alert.alert("Falta la respuesta", "Escribí una respuesta antes de enviarla.");
+      Alert.alert(
+        "Falta la respuesta",
+        "Escribí una respuesta antes de enviarla.",
+      );
       return;
     }
 
@@ -417,7 +626,7 @@ export default function DetalleComercioScreen() {
       Alert.alert(
         "Error",
         error?.response?.data?.mensaje ||
-          "No se pudo publicar la respuesta. Recordá que solo se permite una respuesta por reseña."
+          "No se pudo publicar la respuesta. Recordá que solo se permite una respuesta por reseña.",
       );
     }
   }
@@ -452,7 +661,7 @@ export default function DetalleComercioScreen() {
   const longitud = comercio.coordenadas?.longitud ?? 0;
 
   const miResena = resenas.find(
-    (resena) => resena.usuarioId === usuarioActual?.id
+    (resena) => resena.usuarioId === usuarioActual?.id,
   );
 
   const esComercioPropietario =
@@ -658,7 +867,7 @@ export default function DetalleComercioScreen() {
               disabled={guardandoResena}
             >
               <Text style={styles.textoBoton}>
-                {guardandoResena ? "Publicando..." : "Publicar reseña"}
+                {guardandoResena ? "Guardando..." : "Publicar reseña"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -666,7 +875,9 @@ export default function DetalleComercioScreen() {
 
         {usuarioActual?.rol === "vecino" && miResena ? (
           <Text style={styles.aviso}>
-            Ya publicaste una reseña para este comercio. Podés editarla o eliminarla.
+            {miResena.sincronizada === false
+              ? "Tu reseña está guardada en este dispositivo y pendiente de sincronización. Se enviará automáticamente cuando vuelva la conexión."
+              : "Ya publicaste una reseña para este comercio. Podés editarla o eliminarla."}
           </Text>
         ) : null}
 
@@ -689,6 +900,7 @@ export default function DetalleComercioScreen() {
         ) : (
           resenas.map((resena) => {
             const esMiResena = resena.usuarioId === usuarioActual?.id;
+            const estaPendiente = resena.sincronizada === false;
 
             return (
               <View key={resena.id} style={styles.tarjetaResena}>
@@ -703,6 +915,12 @@ export default function DetalleComercioScreen() {
                 <Text style={styles.fechaResena}>
                   {new Date(resena.creadaEn).toLocaleDateString("es-AR")}
                 </Text>
+
+                {estaPendiente ? (
+                  <Text style={styles.avisoPendiente}>
+                    Pendiente de sincronización
+                  </Text>
+                ) : null}
 
                 {resenaEditando === resena.id ? (
                   <View>
@@ -747,7 +965,9 @@ export default function DetalleComercioScreen() {
                   </Text>
                 )}
 
-                {esMiResena && resenaEditando !== resena.id ? (
+                {esMiResena &&
+                !estaPendiente &&
+                resenaEditando !== resena.id ? (
                   <View style={styles.accionesResena}>
                     <TouchableOpacity
                       onPress={() => {
@@ -794,7 +1014,9 @@ export default function DetalleComercioScreen() {
                   </View>
                 ) : null}
 
-                {esComercioPropietario && !resena.respuesta ? (
+                {esComercioPropietario &&
+                !resena.respuesta &&
+                !estaPendiente ? (
                   <View style={styles.formularioRespuesta}>
                     {resenaRespondiendo === resena.id ? (
                       <>
@@ -1007,6 +1229,12 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 13,
     marginVertical: 12,
+  },
+  avisoPendiente: {
+    color: "#b26a00",
+    fontSize: 12,
+    fontWeight: "600",
+    marginBottom: 8,
   },
   tarjetaResena: {
     backgroundColor: "#f9f9f9",

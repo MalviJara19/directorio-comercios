@@ -137,6 +137,20 @@ export default function PerfilVecino() {
 
           <TouchableOpacity
             style={styles.opcion}
+            onPress={() => router.push("/perfiles/editar")}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.textoOpcion}>
+              ✏️ Editar mis datos
+            </Text>
+
+            <Text style={styles.detalle}>
+              Modificá tu nombre, email o contraseña
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.opcion}
             onPress={() => router.push("/perfiles/favoritos")}
             activeOpacity={0.7}
           >
@@ -286,4 +300,3 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
-
