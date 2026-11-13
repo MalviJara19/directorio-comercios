@@ -77,3 +77,40 @@ export interface UsoDePromocion {
   codigo: string;
   validadoEn: string | null;
 }
+export type RubroComercio =
+  | "gastronomia"
+  | "indumentaria"
+  | "hogar"
+  | "ferreteria y construccion"
+  | "salud y farmacia"
+  | "servicios"
+  | "tecnologia"
+  | "libreria"
+  | "otros";
+
+export interface ComercioListado {
+  id: string;
+  nombre: string;
+  rubro: RubroComercio;
+  descripcion: string;
+  direccion: string;
+  latitud: number;
+  longitud: number;
+  telefono: string | null;
+  whatsapp: string | null;
+  redesSociales: string | null;
+  mediosDePago: string[];
+  fotos: string[];
+  videoPresentacion: string | null;
+  horarios: Horario[] | {
+    aperturaManana?: string | null;
+    cierreManana?: string | null;
+    aperturaTarde?: string | null;
+    cierreTarde?: string | null;
+    atiendeSabados?: boolean;
+    cierreSabado?: string | null;
+  } | null;
+  estaAbiertoPorVacaciones: boolean;
+  promedioEstrellas: number;
+  totalResenas: number;
+}

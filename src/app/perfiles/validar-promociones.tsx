@@ -1,244 +1,294 @@
-import { useEffect, useState } from "react";
+
+import { CameraView, useCameraPermissions } from "expo-camera";
+import { useRouter } from "expo-router";
+import { useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 
-import { validarUsoPromocion } from "@/servicios/api";
-import { CameraView, useCameraPermissions } from "expo-camera";
-import * as Haptics from "expo-haptics";
-import * as LocalAuthentication from "expo-local-authentication";
-import { useRouter } from "expo-router";
+import AppTabs from "@/components/app-tabs";
+import { validarCodigoPromocion } from "@/servicios/serviciosComercios";
 
 export default function ValidarPromociones() {
   const router = useRouter();
-
   const [permiso, solicitarPermiso] = useCameraPermissions();
-  const [codigoEscaneado, setCodigoEscaneado] = useState<string | null>(null);
+
   const [procesando, setProcesando] = useState(false);
-  const [autenticado, setAutenticado] = useState(false);
-  const [verificandoHuella, setVerificandoHuella] = useState(true);
+  const [codigoValidado, setCodigoValidado] = useState("");
+  const [mensajeError, setMensajeError] = useState("");
+  const [validacionExitosa, setValidacionExitosa] = useState(false);
 
-  useEffect(() => {
-    async function verificarIdentidad() {
-      try {
-        const tieneHardware = await LocalAuthentication.hasHardwareAsync();
+  const bloqueoEscaneo = useRef(false);
 
-        const tieneHuellaRegistrada =
-          await LocalAuthentication.isEnrolledAsync();
-
-        if (!tieneHardware || !tieneHuellaRegistrada) {
-          Alert.alert(
-            "Autenticación no disponible",
-            "Este dispositivo no tiene autenticación biométrica configurada.",
-            [{ text: "Volver", onPress: () => router.back() }],
-          );
-          return;
-        }
-
-        const resultado = await LocalAuthentication.authenticateAsync({
-          promptMessage: "Autenticá tu identidad para validar promociones",
-          cancelLabel: "Cancelar",
-        });
-
-        if (resultado.success) {
-          setAutenticado(true);
-        } else {
-          Alert.alert(
-            "Acceso no autorizado",
-            "Necesitás autenticarte para utilizar el lector QR.",
-            [{ text: "Volver", onPress: () => router.back() }],
-          );
-        }
-      } catch (error) {
-        console.error("Error en autenticación biométrica:", error);
-        Alert.alert("Error", "No se pudo verificar tu identidad.", [
-          { text: "Volver", onPress: () => router.back() },
-        ]);
-      } finally {
-        setVerificandoHuella(false);
-      }
+  async function manejarEscaneo(resultado: { data: string }) {
+    if (bloqueoEscaneo.current || !resultado.data) {
+      return;
     }
 
-    verificarIdentidad();
-  }, []);
-
-  async function procesarCodigo(codigo: string) {
-    if (procesando) return;
+    bloqueoEscaneo.current = true;
+    setProcesando(true);
+    setMensajeError("");
+    setCodigoValidado(resultado.data);
 
     try {
-      setProcesando(true);
-      setCodigoEscaneado(codigo);
+      await validarCodigoPromocion(resultado.data);
+      setValidacionExitosa(true);
+    } catch (error) {
+      const errorApi = error as {
+        response?: {
+          data?: {
+            mensaje?: string;
+            message?: string;
+            error?: {
+              mensaje?: string;
+            };
+          };
+        };
+        message?: string;
+      };
 
-      const resultado = await validarUsoPromocion(codigo);
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      Alert.alert(
-        "¡Promoción validada!",
-        "El uso de la promoción se registró correctamente.",
-      );
-
-      console.log("Resultado de la validación:", resultado);
-    } catch (error: any) {
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      console.error("Error al validar el QR:", error);
-
-      Alert.alert(
-        "No se pudo validar",
-        error.response?.data?.error?.mensaje ||
-          "El código QR no es válido o no se pudo registrar.",
+      setValidacionExitosa(false);
+      setMensajeError(
+        errorApi.response?.data?.error?.mensaje ??
+          errorApi.response?.data?.mensaje ??
+          errorApi.response?.data?.message ??
+          errorApi.message ??
+          "No se pudo validar el código."
       );
     } finally {
       setProcesando(false);
     }
   }
 
-  if (verificandoHuella) {
-    return (
-      <View style={estilos.cargando}>
-        <ActivityIndicator size="large" />
-        <Text>Verificando identidad...</Text>
-      </View>
-    );
-  }
-
-  if (!autenticado) {
-    return null;
+  function volverAEscanear() {
+    bloqueoEscaneo.current = false;
+    setCodigoValidado("");
+    setMensajeError("");
+    setValidacionExitosa(false);
   }
 
   if (!permiso) {
     return (
-      <View style={estilos.cargando}>
-        <ActivityIndicator size="large" />
+      <View style={styles.contenedor}>
+        <ActivityIndicator size="large" color="#0a7ea4" />
       </View>
     );
   }
 
   if (!permiso.granted) {
     return (
-      <View style={estilos.contenedor}>
-        <Text style={estilos.titulo}>Validar promociones</Text>
+      <View style={styles.contenedor}>
+        <Text style={styles.titulo}>Validar promociones</Text>
 
-        <Text style={estilos.texto}>
-          Necesitamos acceder a la cámara para escanear el código QR del
-          cliente.
+        <Text style={styles.descripcion}>
+          Necesitamos permiso para utilizar la cámara y escanear los códigos QR
+          de tus clientes.
         </Text>
 
-        <TouchableOpacity style={estilos.boton} onPress={solicitarPermiso}>
-          <Text style={estilos.textoBoton}>Permitir acceso a la cámara</Text>
+        <TouchableOpacity
+          style={styles.boton}
+          onPress={solicitarPermiso}
+        >
+          <Text style={styles.textoBoton}>Permitir acceso a la cámara</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.botonVolver}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.textoVolver}>Volver</Text>
+        </TouchableOpacity>
+
+        <AppTabs />
       </View>
     );
   }
 
   return (
-    <View style={estilos.contenedor}>
-      <TouchableOpacity
-        style={estilos.botonVolver}
-        onPress={() => router.back()}
-      >
-        <Text style={estilos.textoVolver}>‹ Volver</Text>
-      </TouchableOpacity>
+    <View style={styles.contenedor}>
+      <View style={styles.contenido}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={styles.volver}>‹ Volver</Text>
+        </TouchableOpacity>
 
-      <Text style={estilos.titulo}>Validar promociones</Text>
+        <Text style={styles.titulo}>Validar promociones</Text>
 
-      <Text style={estilos.texto}>
-        Apuntá la cámara al código QR que muestra el cliente.
-      </Text>
+        <Text style={styles.descripcion}>
+          Escaneá el código QR que presenta el cliente para validar el uso de
+          su promoción.
+        </Text>
 
-      <CameraView
-        style={estilos.camara}
-        facing="back"
-        barcodeScannerSettings={{
-          barcodeTypes: ["qr"],
-        }}
-        onBarcodeScanned={
-          codigoEscaneado || procesando
-            ? undefined
-            : ({ data }) => procesarCodigo(data)
-        }
-      />
+        {!codigoValidado && (
+          <View style={styles.contenedorCamara}>
+            <CameraView
+              style={styles.camara}
+              facing="back"
+              barcodeScannerSettings={{
+                barcodeTypes: ["qr"],
+              }}
+              onBarcodeScanned={
+                bloqueoEscaneo.current ? undefined : manejarEscaneo
+              }
+            />
+          </View>
+        )}
 
-      {codigoEscaneado && (
-        <View style={estilos.resultado}>
-          <Text style={estilos.textoResultado}>Código detectado:</Text>
-          <Text>{codigoEscaneado}</Text>
+        {procesando && (
+          <View style={styles.resultado}>
+            <ActivityIndicator size="large" color="#0a7ea4" />
+            <Text style={styles.descripcion}>
+              Validando código...
+            </Text>
+          </View>
+        )}
 
-          {procesando ? (
-            <ActivityIndicator size="small" style={{ marginTop: 15 }} />
-          ) : (
+        {!procesando && validacionExitosa && (
+          <View style={styles.resultado}>
+            <Text style={styles.iconoExito}>✓</Text>
+            <Text style={styles.tituloExito}>
+              ¡Promoción validada!
+            </Text>
+            <Text style={styles.descripcion}>
+              El código fue registrado correctamente como utilizado.
+            </Text>
+            <Text style={styles.codigo}>{codigoValidado}</Text>
+
             <TouchableOpacity
-              style={estilos.boton}
-              onPress={() => setCodigoEscaneado(null)}
+              style={styles.boton}
+              onPress={volverAEscanear}
             >
-              <Text style={estilos.textoBoton}>Escanear otro código</Text>
+              <Text style={styles.textoBoton}>
+                Escanear otro código
+              </Text>
             </TouchableOpacity>
-          )}
-        </View>
-      )}
+          </View>
+        )}
+
+        {!procesando && mensajeError !== "" && (
+          <View style={styles.resultado}>
+            <Text style={styles.tituloError}>
+              No se pudo validar
+            </Text>
+            <Text style={styles.error}>{mensajeError}</Text>
+            <Text style={styles.codigo}>{codigoValidado}</Text>
+
+            <TouchableOpacity
+              style={styles.boton}
+              onPress={volverAEscanear}
+            >
+              <Text style={styles.textoBoton}>
+                Intentar nuevamente
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      <AppTabs />
     </View>
   );
 }
 
-const estilos = StyleSheet.create({
+const styles = StyleSheet.create({
   contenedor: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
-    padding: 20,
-    paddingTop: 40,
+    backgroundColor: "#F7F8FA",
   },
-  cargando: {
+  contenido: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    padding: 20,
+  },
+  volver: {
+    color: "#0a7ea4",
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 20,
   },
   titulo: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#222222",
-    marginBottom: 15,
+    color: "#263238",
+    textAlign: "center",
+    marginBottom: 12,
   },
-  texto: {
+  descripcion: {
     fontSize: 15,
-    color: "#555555",
+    color: "#718096",
+    textAlign: "center",
+    lineHeight: 22,
     marginBottom: 20,
   },
-  camara: {
+  contenedorCamara: {
     width: "100%",
-    height: 350,
-    borderRadius: 12,
+    height: 330,
     overflow: "hidden",
+    borderRadius: 16,
+    backgroundColor: "#263238",
+    marginTop: 10,
+  },
+  camara: {
+    flex: 1,
+  },
+  resultado: {
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 22,
+    marginTop: 20,
+  },
+  iconoExito: {
+    fontSize: 48,
+    color: "#15803d",
+    fontWeight: "bold",
+  },
+  tituloExito: {
+    fontSize: 21,
+    fontWeight: "bold",
+    color: "#15803d",
+    marginVertical: 10,
+  },
+  tituloError: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#dc2626",
+    marginBottom: 10,
+  },
+  error: {
+    color: "#dc2626",
+    textAlign: "center",
+    fontSize: 14,
+    marginBottom: 10,
+  },
+  codigo: {
+    color: "#263238",
+    fontWeight: "bold",
+    letterSpacing: 2,
+    marginVertical: 12,
   },
   boton: {
-    backgroundColor: "#228B55",
+    backgroundColor: "#0a7ea4",
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: "center",
+    width: "100%",
+    marginTop: 10,
   },
   textoBoton: {
     color: "#FFFFFF",
     fontWeight: "bold",
+    fontSize: 15,
   },
   botonVolver: {
-    marginBottom: 20,
+    padding: 15,
+    alignItems: "center",
+    marginTop: 10,
   },
   textoVolver: {
     color: "#0a7ea4",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  resultado: {
-    backgroundColor: "#FFFFFF",
-    padding: 15,
-    borderRadius: 8,
-    marginTop: 20,
-  },
-  textoResultado: {
     fontWeight: "bold",
-    marginBottom: 5,
   },
 });

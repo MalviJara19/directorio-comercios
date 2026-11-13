@@ -1,33 +1,67 @@
-import { Horario } from "@/tipos/comercios";
+import { Horario } from "../tipos/comercios";
 
-export const estaAbiertoAhora = (
-  horarios: Horario[],
-  fechaActual: Date = new Date(),
-): boolean => {
-  if (!horarios || horarios.length === 0) return false;
+interface HorariosAntiguos {
+  aperturaManana?: string | null;
+  cierreManana?: string | null;
+  aperturaTarde?: string | null;
+  cierreTarde?: string | null;
+  atiendeSabados?: boolean;
+  cierreSabado?: string | null;
+}
 
-  const diaSemana = fechaActual.getDay();
-  const horaActual = fechaActual.getHours();
-  const minutosActuales = fechaActual.getMinutes();
+type Horarios = Horario[] | HorariosAntiguos | null | undefined;
 
-  const minutosTotalesActuales = horaActual * 60 + minutosActuales;
-
-  const horarioHoy = horarios.find(
-    (horario) => horario.dia === diaSemana,
-  );
-
-  if (!horarioHoy) return false;
-
-  const apertura = convertirAMinutos(horarioHoy.abre);
-  const cierre = convertirAMinutos(horarioHoy.cierra);
-
-  return (
-    minutosTotalesActuales >= apertura &&
-    minutosTotalesActuales <= cierre
-  );
+const convertirAMinutos = (hora: string): number => {
+  const [horas, minutos] = hora.split(":").map(Number);
+  return horas * 60 + minutos;
 };
 
-const convertirAMinutos = (horaStr: string): number => {
-  const [horas, minutos] = horaStr.split(":").map(Number);
-  return horas * 60 + minutos;
+export const estaAbiertoAhora = (
+  horarios: Horarios,
+  fechaActual: Date = new Date(),
+): boolean => {
+  if (!horarios) return false;
+
+  const dia = fechaActual.getDay();
+  const minutos =
+    fechaActual.getHours() * 60 + fechaActual.getMinutes();
+
+  if (Array.isArray(horarios)) {
+    return horarios.some((horario) => {
+      if (horario.dia !== dia) return false;
+
+      return (
+        minutos >= convertirAMinutos(horario.abre) &&
+        minutos <= convertirAMinutos(horario.cierra)
+      );
+    });
+  }
+
+  if (dia === 0) return false;
+
+  if (dia === 6) {
+    if (!horarios.atiendeSabados || !horarios.cierreSabado) {
+      return false;
+    }
+
+    return (
+      !!horarios.aperturaManana &&
+      minutos >= convertirAMinutos(horarios.aperturaManana) &&
+      minutos <= convertirAMinutos(horarios.cierreSabado)
+    );
+  }
+
+  const turnos = [
+    [horarios.aperturaManana, horarios.cierreManana],
+    [horarios.aperturaTarde, horarios.cierreTarde],
+  ];
+
+  return turnos.some(([abre, cierra]) => {
+    if (!abre || !cierra) return false;
+
+    return (
+      minutos >= convertirAMinutos(abre) &&
+      minutos <= convertirAMinutos(cierra)
+    );
+  });
 };
