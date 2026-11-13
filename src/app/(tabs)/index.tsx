@@ -14,19 +14,8 @@ import {
 } from "react-native";
 
 import { obtenerComercios as obtenerComerciosApi } from "@/servicios/api";
-import { Comercio } from "@/tipos/comercios";
+import { Comercio, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
-
-type RubroComercio =
-  | "gastronomia"
-  | "indumentaria"
-  | "hogar"
-  | "ferreteria y construccion"
-  | "salud y farmacia"
-  | "servicios"
-  | "tecnologia"
-  | "libreria"
-  | "otros";
 
 const LISTA_RUBROS: {
   label: string;
