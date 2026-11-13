@@ -1,6 +1,10 @@
 
 import axios from "axios";
 import { obtenerToken } from "./sesion";
+import type {
+  Promocion,
+  UsoDePromocion,
+} from "@/tipos/comercios";
 
 export const api = axios.create({
   baseURL: "http://192.168.1.68:3000",
@@ -19,7 +23,14 @@ api.interceptors.request.use(async (config) => {
   return config;
 });
 
-export async function iniciarSesion(email: string, contrasena: string) {
+// ================================
+// AUTENTICACIÓN
+// ================================
+
+export async function iniciarSesion(
+  email: string,
+  contrasena: string,
+) {
   const respuesta = await api.post("/auth/ingreso", {
     email,
     contrasena,
@@ -41,6 +52,10 @@ export async function registrarUsuario(
 
   return respuesta.data;
 }
+
+// ================================
+// MI COMERCIO
+// ================================
 
 export async function obtenerMiComercio() {
   const respuesta = await api.get("/mi-comercio");
@@ -67,6 +82,10 @@ export async function actualizarMiComercio(datos: {
   return respuesta.data.datos;
 }
 
+// ================================
+// ARCHIVOS
+// ================================
+
 export async function subirArchivo(archivo: {
   uri: string;
   name: string;
@@ -91,6 +110,10 @@ export async function subirArchivo(archivo: {
   return respuesta.data.datos;
 }
 
+// ================================
+// PROMOCIONES
+// ================================
+
 export async function obtenerMisPromociones() {
   const respuesta = await api.get("/mi-comercio/promociones");
   return respuesta.data.datos;
@@ -105,7 +128,11 @@ export async function crearPromocion(datos: {
   imagenUrl: string | null;
   soloApp: boolean;
 }) {
-  const respuesta = await api.post("/mi-comercio/promociones", datos);
+  const respuesta = await api.post(
+    "/mi-comercio/promociones",
+    datos,
+  );
+
   return respuesta.data.datos;
 }
 
@@ -121,23 +148,118 @@ export async function editarPromocion(
     soloApp: boolean;
   },
 ) {
-  const respuesta = await api.patch(`/mi-comercio/promociones/${id}`, datos);
+  const respuesta = await api.patch(
+    `/mi-comercio/promociones/${id}`,
+    datos,
+  );
+
   return respuesta.data.datos;
 }
 
 export async function desactivarPromocion(id: string) {
-  const respuesta = await api.delete(`/mi-comercio/promociones/${id}`);
+  const respuesta = await api.delete(
+    `/mi-comercio/promociones/${id}`,
+  );
+
   return respuesta.data.datos;
 }
 
+// Obtener promociones disponibles para los usuarios.
+export type EstadoPromocionesQR =
+  | "vigentes"
+  | "proximas"
+  | "por-vencer";
+
+export async function obtenerPromocionesDisponibles(
+  estado: EstadoPromocionesQR = "vigentes",
+): Promise<Promocion[]> {
+  const porPagina = 20;
+
+  const primeraRespuesta = await api.get("/promociones", {
+    params: {
+      estado,
+      pagina: 1,
+      porPagina,
+    },
+  });
+
+  const promociones: Promocion[] = [
+    ...(primeraRespuesta.data.datos ?? []),
+  ];
+
+  const totalPaginas = Math.ceil(
+    (primeraRespuesta.data.meta?.total ?? promociones.length) /
+      (primeraRespuesta.data.meta?.porPagina ?? porPagina),
+  );
+
+  for (let pagina = 2; pagina <= totalPaginas; pagina++) {
+    const respuesta = await api.get("/promociones", {
+      params: {
+        estado,
+        pagina,
+        porPagina,
+      },
+    });
+
+    promociones.push(...(respuesta.data.datos ?? []));
+  }
+
+  return promociones;
+}
+
+// ================================
+// CÓDIGOS QR DE PROMOCIONES
+// ================================
+
+// Validar un código QR desde el comercio.
 export async function validarUsoPromocion(codigo: string) {
-  const respuesta = await api.post("/mi-comercio/usos/validar", { codigo });
+  const respuesta = await api.post(
+    "/mi-comercio/usos/validar",
+    { codigo },
+  );
+
   return respuesta.data.datos;
 }
 
-export async function obtenerComercios(pagina = 1, porPagina = 20) {
+// Generar o recuperar el código QR de una promoción.
+export async function generarCodigoPromocion(
+  promocionId: string,
+): Promise<UsoDePromocion> {
+  const respuesta = await api.post(
+    `/promociones/${promocionId}/usos`,
+  );
+
+  return respuesta.data.datos;
+}
+
+// Obtener los códigos QR del usuario autenticado.
+export async function obtenerMisUsos(
+  pagina: number = 1,
+  porPagina: number = 20,
+): Promise<UsoDePromocion[]> {
+  const respuesta = await api.get("/yo/usos", {
+    params: {
+      pagina,
+      porPagina,
+    },
+  });
+
+  return respuesta.data.datos ?? [];
+}
+
+// ================================
+// COMERCIOS
+// ================================
+
+export async function obtenerComercios(
+  pagina = 1,
+  porPagina = 20,
+) {
   const respuesta = await api.get("/comercios", {
-    params: { pagina, porPagina },
+    params: {
+      pagina,
+      porPagina,
+    },
   });
 
   return respuesta.data;
@@ -148,22 +270,38 @@ export async function obtenerRubros() {
   return respuesta.data.datos;
 }
 
+// ================================
+// FAVORITOS
+// ================================
+
 export async function agregarFavorito(comercioId: string) {
-  const respuesta = await api.put(`/yo/favoritos/${comercioId}`);
+  const respuesta = await api.put(
+    `/yo/favoritos/${comercioId}`,
+  );
+
   return respuesta.data;
 }
 
 export async function quitarFavorito(comercioId: string) {
-  const respuesta = await api.delete(`/yo/favoritos/${comercioId}`);
+  const respuesta = await api.delete(
+    `/yo/favoritos/${comercioId}`,
+  );
+
   return respuesta.data;
 }
+
+// ================================
+// PERFIL
+// ================================
 
 export async function obtenerMiPerfil() {
   const respuesta = await api.get("/yo");
   return respuesta.data.datos;
 }
 
-export async function actualizarRubrosDeInteres(rubrosDeInteres: string[]) {
+export async function actualizarRubrosDeInteres(
+  rubrosDeInteres: string[],
+) {
   const respuesta = await api.patch("/yo", {
     rubrosDeInteres,
   });
@@ -171,7 +309,9 @@ export async function actualizarRubrosDeInteres(rubrosDeInteres: string[]) {
   return respuesta.data.datos;
 }
 
-export async function actualizarAvisosActivos(avisosActivos: boolean) {
+export async function actualizarAvisosActivos(
+  avisosActivos: boolean,
+) {
   const respuesta = await api.patch("/yo", {
     avisosActivos,
   });
@@ -184,7 +324,6 @@ export async function actualizarAvisosActivos(avisosActivos: boolean) {
 // ================================
 
 // Obtener las reseñas de un comercio.
-// Devuelve datos y metadatos de paginación.
 export async function obtenerResenasPorComercio(
   comercioId: string,
   pagina = 1,
@@ -193,7 +332,10 @@ export async function obtenerResenasPorComercio(
   const respuesta = await api.get(
     `/comercios/${comercioId}/resenas`,
     {
-      params: { pagina, porPagina },
+      params: {
+        pagina,
+        porPagina,
+      },
     },
   );
 
@@ -260,6 +402,11 @@ export async function responderResena(
 
   return respuesta.data.datos;
 }
+
+// ================================
+// CUENTA
+// ================================
+
 // Actualizar datos personales de la cuenta.
 export async function actualizarDatosCuenta(datos: {
   nombre?: string;
