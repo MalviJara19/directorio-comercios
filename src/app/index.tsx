@@ -14,7 +14,7 @@ import {
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
-import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { ComercioListado, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -55,7 +55,7 @@ const LISTA_RUBROS: {
 export default function HomeScreen() {
   const router = useRouter();
 
-  const [comercios, setComercios] = useState<Comercio[]>([]);
+  const [comercios, setComercios] = useState<ComercioListado[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
   const [busqueda, setBusqueda] = useState<string>("");
   const [rubroSeleccionado, setRubroSeleccionado] = useState<
@@ -94,7 +94,7 @@ export default function HomeScreen() {
         }
       } while (todosLosComercios.length < total);
 
-      const comerciosAdaptados: Comercio[] = todosLosComercios
+  const comerciosAdaptados: ComercioListado[] = todosLosComercios
         .filter((c) => c.activo !== false)
         .map((c) => ({
           id: c.id,

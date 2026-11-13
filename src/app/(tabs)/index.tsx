@@ -12,7 +12,7 @@ import {
 } from "react-native";
 
 import { obtenerComercios } from "@/servicios/serviciosComercios";
-import { Comercio, RubroComercio } from "@/tipos/comercios";
+import { ComercioListado, RubroComercio } from "@/tipos/comercios";
 import { estaAbiertoAhora } from "@/utilidades/horarios";
 import { Button } from "react-native";
 
@@ -32,7 +32,7 @@ const LISTA_RUBROS: { label: string; value: RubroComercio | "todos" }[] = [
 export default function HomeScreen() {
   const router = useRouter();
 
-  const [comercios, setComercios] = useState<Comercio[]>([]);
+  const [comercios, setComercios] = useState<ComercioListado[]>([]);
   const [cargando, setCargando] = useState<boolean>(true);
 
   const [busqueda, setBusqueda] = useState<string>("");

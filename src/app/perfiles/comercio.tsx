@@ -1,6 +1,6 @@
 
-import { useEffect, useState } from "react";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -97,13 +97,15 @@ export default function PerfilComercio() {
             key={opcion.titulo}
             style={styles.tarjeta}
             activeOpacity={0.7}
-            onPress={() => {
-              if (opcion.titulo === "Datos del comercio") {
-              router.push("/perfiles/datos-comercio");
-              } else {
-              mostrarProximamente(opcion.titulo);
-             }
-           }}
+           onPress={() => {
+  if (opcion.titulo === "Datos del comercio") {
+    router.push("/perfiles/datos-comercio");
+  } else if (opcion.titulo === "Validar promociones") {
+    router.push("/perfiles/validar-promociones");
+  } else {
+    mostrarProximamente(opcion.titulo);
+  }
+}}
             >
             <Text style={styles.iconoTarjeta}>{opcion.icono}</Text>
 
