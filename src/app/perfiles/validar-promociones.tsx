@@ -1,13 +1,15 @@
 
 import { CameraView, useCameraPermissions } from "expo-camera";
+import * as LocalAuthentication from "expo-local-authentication";
 import { useRouter } from "expo-router";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
-    ActivityIndicator,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 import AppTabs from "@/components/app-tabs";
@@ -22,7 +24,90 @@ export default function ValidarPromociones() {
   const [mensajeError, setMensajeError] = useState("");
   const [validacionExitosa, setValidacionExitosa] = useState(false);
 
+  const [autenticado, setAutenticado] = useState(false);
+  const [verificandoBiometria, setVerificandoBiometria] = useState(true);
+
   const bloqueoEscaneo = useRef(false);
+
+  // Autenticación biométrica al ingresar a la pantalla.
+  useEffect(() => {
+    let activo = true;
+
+    async function verificarIdentidad() {
+      try {
+        const tieneHardware =
+          await LocalAuthentication.hasHardwareAsync();
+
+        const tieneBiometriaRegistrada =
+          await LocalAuthentication.isEnrolledAsync();
+
+        if (!activo) return;
+
+        if (!tieneHardware || !tieneBiometriaRegistrada) {
+          Alert.alert(
+            "Autenticación no disponible",
+            "Este dispositivo no tiene autenticación biométrica configurada.",
+            [
+              {
+                text: "Volver",
+                onPress: () => router.back(),
+              },
+            ]
+          );
+          return;
+        }
+
+        const resultado =
+          await LocalAuthentication.authenticateAsync({
+            promptMessage:
+              "Autenticá tu identidad para validar promociones",
+            cancelLabel: "Cancelar",
+          });
+
+        if (!activo) return;
+
+        if (resultado.success) {
+          setAutenticado(true);
+        } else {
+          Alert.alert(
+            "Acceso no autorizado",
+            "Necesitás autenticarte para utilizar el lector QR.",
+            [
+              {
+                text: "Volver",
+                onPress: () => router.back(),
+              },
+            ]
+          );
+        }
+      } catch (error) {
+        console.error("Error en autenticación biométrica:", error);
+
+        if (activo) {
+          Alert.alert(
+            "Error",
+            "No se pudo verificar tu identidad.",
+            [
+              {
+                text: "Volver",
+                onPress: () => router.back(),
+              },
+            ]
+          );
+        }
+      } finally {
+        if (activo) {
+          setVerificandoBiometria(false);
+        }
+      }
+    }
+
+    verificarIdentidad();
+
+    return () => {
+      activo = false;
+    };
+  }, [router]);
 
   async function manejarEscaneo(resultado: { data: string }) {
     if (bloqueoEscaneo.current || !resultado.data) {
@@ -71,6 +156,23 @@ export default function ValidarPromociones() {
     setValidacionExitosa(false);
   }
 
+  // Primero se verifica la identidad.
+  if (verificandoBiometria) {
+    return (
+      <View style={styles.contenedor}>
+        <ActivityIndicator size="large" color="#0a7ea4" />
+        <Text style={styles.descripcion}>
+          Verificando identidad...
+        </Text>
+      </View>
+    );
+  }
+
+  // Sin autenticación no se permite acceder al lector.
+  if (!autenticado) {
+    return null;
+  }
+
   if (!permiso) {
     return (
       <View style={styles.contenedor}>
@@ -93,7 +195,9 @@ export default function ValidarPromociones() {
           style={styles.boton}
           onPress={solicitarPermiso}
         >
-          <Text style={styles.textoBoton}>Permitir acceso a la cámara</Text>
+          <Text style={styles.textoBoton}>
+            Permitir acceso a la cámara
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -149,12 +253,15 @@ export default function ValidarPromociones() {
         {!procesando && validacionExitosa && (
           <View style={styles.resultado}>
             <Text style={styles.iconoExito}>✓</Text>
+
             <Text style={styles.tituloExito}>
               ¡Promoción validada!
             </Text>
+
             <Text style={styles.descripcion}>
               El código fue registrado correctamente como utilizado.
             </Text>
+
             <Text style={styles.codigo}>{codigoValidado}</Text>
 
             <TouchableOpacity
@@ -173,7 +280,9 @@ export default function ValidarPromociones() {
             <Text style={styles.tituloError}>
               No se pudo validar
             </Text>
+
             <Text style={styles.error}>{mensajeError}</Text>
+
             <Text style={styles.codigo}>{codigoValidado}</Text>
 
             <TouchableOpacity
@@ -197,6 +306,7 @@ const styles = StyleSheet.create({
   contenedor: {
     flex: 1,
     backgroundColor: "#F7F8FA",
+    justifyContent: "center",
   },
   contenido: {
     flex: 1,
